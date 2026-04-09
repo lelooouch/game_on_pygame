@@ -1,5 +1,7 @@
 import pygame
 import sys
+from base import *
+
 
 pygame.init()
 
@@ -143,8 +145,8 @@ class DownTab():
         self.image_up = pygame.transform.scale(
             pygame.image.load("pic/up.png"), (50, 50))
 
-        self.h1 = pygame.transform.scale(
-            pygame.image.load("pic/house/h1.jpg"), (180, 180))
+        # self.h1 = pygame.transform.scale(
+        #     pygame.image.load("pic/house/h1.jpg"), (180, 180))
 
         self.current_image = self.image_down
         self._update_image_rect()
@@ -177,7 +179,11 @@ class DownTab():
         # Рисуем картинку
         screen.blit(self.current_image, self.image_rect)
         if not self.is_open:
-            screen.blit(self.h1, (100, self.height + 60)) # картика дома
+            i = 0
+            for obj in buildings.keys():
+                h1 = pygame.transform.scale(pygame.image.load(f"pic/house/{obj}"), (180, 190))
+                screen.blit(h1, (100 + i, self.height + 60)) # картика дома
+                i += 200
 
 
 class Game:
