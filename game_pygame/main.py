@@ -22,6 +22,15 @@ background = pygame.transform.scale(background, (screen_width + 5000, screen_hei
 
 clock = pygame.time.Clock()
 
+class Player:
+    def __init__(self, gold, woods, iron, stone):
+        self.gold = gold
+        self.woods = woods
+        self.iron = iron
+        self.stone = stone
+
+
+
 class Grid:
     # КЛАСС СОЗДАНИЯ ПОЛЯ
 
@@ -151,6 +160,8 @@ class DownTab():
         self.current_image = self.image_down
         self._update_image_rect()
 
+        self.buildings = buildings
+
     def _update_image_rect(self):
         """Вспомогательный метод для обновления позиции картинки"""
         y_pos = self.screen_height - 50 if self.is_open else self.height + 30
@@ -180,10 +191,42 @@ class DownTab():
         screen.blit(self.current_image, self.image_rect)
         if not self.is_open:
             i = 0
-            for obj in buildings.keys():
+            for obj in self.buildings.keys():
                 h1 = pygame.transform.scale(pygame.image.load(f"pic/house/{obj}"), (180, 190))
                 screen.blit(h1, (100 + i, self.height + 60)) # картика дома
+                h1_rect = h1.get_rect()
+                h1_rect.topleft = (100 + i, self.height + 60)
+                self.buildings[obj]['position'] = h1_rect
                 i += 200
+
+    def house_check(self):
+        mouse_pos = pygame.mouse.get_pos()
+
+        # Проверяем, на какой картинке курсор и открыто ли окно с домами
+        if not self.is_open:
+            for info in self.buildings.keys():
+                is_hovering = self.buildings[info]['position'].collidepoint(mouse_pos)
+                if is_hovering:
+                    text = ''
+                    for par, value in self.buildings[info].items():
+                        if par in ['price', 'woods', 'iron', 'stone'] and value:
+                            text += f'{par.capitalize()}: {value} '
+
+                    font = pygame.font.Font('fonts/DreiFraktur.ttf', 20)
+                    text_surface = font.render(text, True, (255, 255, 255))
+                    text_rect = text_surface.get_rect()
+
+                    # Прямоугольник рядом с курсором (смещение 20 пикселей)
+                    tooltip_rect = pygame.Rect(mouse_pos[0] + 20, mouse_pos[1] + 10,
+                                               text_rect.width + 15, text_rect.height + 8)
+
+                    # Рисуем фон прямоугольника
+                    pygame.draw.rect(screen, (64, 64, 64), tooltip_rect, border_radius=6)
+
+                    # Рисуем текст
+                    screen.blit(text_surface, (mouse_pos[0] + 25, mouse_pos[1] + 15))
+
+
 
 
 class Game:
@@ -211,6 +254,8 @@ class Game:
             self.grid.draw()
 
             self.tab.draw()
+            self.tab.house_check()
+
             pygame.display.flip()
             clock.tick(60)
 
