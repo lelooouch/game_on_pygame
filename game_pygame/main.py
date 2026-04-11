@@ -17,8 +17,8 @@ screen = pygame.display.set_mode((screen_width, screen_height), pygame.FULLSCREE
 pygame.display.set_caption("Полноэкранный режим")
 
 # установка фона
-background = pygame.image.load("pic/bg.jpg")  # Укажите путь к файлу
-background = pygame.transform.scale(background, (screen_width + 5000, screen_height + 5000))
+background = pygame.image.load("pic/bg_2.jpg")  # Укажите путь к файлу
+background = pygame.transform.scale(background, (screen_width + 2000, screen_height + 2000))
 
 clock = pygame.time.Clock()
 
@@ -42,8 +42,8 @@ class Grid:
         self.width = 130
         self.height = 100
 
-        self.x_0_coord = 300
-        self.y_0_coord = 220
+        self.x_0_coord = 350
+        self.y_0_coord = 200
 
         self.rectangles = []
 
@@ -69,8 +69,8 @@ class Grid:
         self.step_x = step_x
         self.step_y = step_y
 
-        self.pos_x = -1000
-        self.pos_y = -1000
+        self.pos_x = -300
+        self.pos_y = -300
 
     def draw(self):
 
@@ -106,7 +106,7 @@ class Grid:
         keys = pygame.key.get_pressed()
 
         # камера вправо
-        if (mouse_pos[0] >= self.screen_width - 2 or keys[pygame.K_RIGHT]) and self.pos_x >= self.screen_width - 6500:
+        if (mouse_pos[0] >= self.screen_width - 2 or keys[pygame.K_RIGHT]) and self.pos_x >= self.screen_width - 2250:
             self.pos_x -= self.step_x
             for rect_info in self.rectangles:
                 rect = pygame.Rect(rect_info['x'] - self.step_x, rect_info['y'], self.width, self.height)
@@ -114,7 +114,7 @@ class Grid:
                 rect_info['x'] -= self.step_x
 
         # камера вниз
-        if (mouse_pos[1] >= self.screen_height - 2 or keys[pygame.K_DOWN]) and self.pos_y >= self.screen_height - 5800:
+        if (mouse_pos[1] >= self.screen_height - 2 or keys[pygame.K_DOWN]) and self.pos_y >= self.screen_height - 1400:
             self.pos_y -= self.step_y
             for rect_info in self.rectangles:
                 rect = pygame.Rect(rect_info['x'], rect_info['y'] - self.step_y, self.width, self.height)
@@ -122,7 +122,7 @@ class Grid:
                 rect_info['y'] -= self.step_y
 
         # камера влево
-        if (mouse_pos[0] <= 2 or keys[pygame.K_LEFT]) and self.pos_x <= self.screen_width - 1800:
+        if (mouse_pos[0] <= 2 or keys[pygame.K_LEFT]) and self.pos_x <= self.screen_width - 1650:
             self.pos_x += self.step_x
             for rect_info in self.rectangles:
                 rect = pygame.Rect(rect_info['x'] + self.step_x, rect_info['y'], self.width, self.height)
@@ -130,7 +130,7 @@ class Grid:
                 rect_info['x'] += self.step_x
 
         # камера вверх
-        if (mouse_pos[1] <= 2 or keys[pygame.K_UP]) and self.pos_y <= self.screen_height - 1000:
+        if (mouse_pos[1] <= 2 or keys[pygame.K_UP]) and self.pos_y <= self.screen_height - 950:
             self.pos_y += self.step_y
             for rect_info in self.rectangles:
                 rect = pygame.Rect(rect_info['x'], rect_info['y'] + self.step_y, self.width, self.height)
