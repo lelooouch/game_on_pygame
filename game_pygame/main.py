@@ -23,50 +23,47 @@ clock = pygame.time.Clock()
 
 class Player:
     def __init__(self, x, y):
-        self.x = x
-        self.y = y
-        self.speed = 5
+        # Мировые координаты (на карте)
+        self.world_x = x
+        self.world_y = y
+        self.speed = 3
+        self.moving = False
 
         # Загружаем картинку человечка
-        self.image = pygame.image.load("pic/2.png")  # путь к вашей картинке
+        self.image = pygame.image.load("pic/2.png")
         self.rect = self.image.get_rect()
-        self.rect.topleft = (x, y)
 
-    def move(self, target_x, target_y):
-        self.target_x = target_x
-        self.target_y = target_y
-        if self.target_x != self.x and self.target_y != self.y:
-            if self.x < self.target_x:
-                self.x += self.speed
-                if self.x > self.target_x:
-                    self.x = self.target_x
-            elif self.x > self.target_x:
-                self.x -= self.speed
-                if self.x < self.target_x:
-                    self.x = self.target_x
+    def move(self):
+        """Движение к цели"""
+        if self.moving:
+            dx = self.target_x - self.world_x
+            dy = self.target_y - self.world_y
+            distance = (dx ** 2 + dy ** 2) ** 0.5
 
-            if self.y < self.target_y:
-                self.y += self.speed
-                if self.y > self.target_y:
-                    self.y = self.target_y
-            elif self.y > self.target_y:
-                self.y -= self.speed
-                if self.y < self.target_y:
-                    self.y = self.target_y
+            if distance < self.speed:
+                self.world_x = self.target_x
+                self.world_y = self.target_y
+                self.moving = False
+            else:
+                self.world_x += (dx / distance) * self.speed
+                self.world_y += (dy / distance) * self.speed
 
-            # Обновляем позицию rect
-            self.rect.topleft = (self.x, self.y)
+    def set_target(self, x, y):
+        """Устанавливает цель для движения (мировые координаты)"""
+        self.target_x = x - 35
+        self.target_y = y - 30
+        self.moving = True
 
-
-    def run(self):
+    def draw(self, screen, camera_x, camera_y):
+        """Рисует персонажа с учетом камеры"""
+        screen_x = self.world_x + camera_x
+        screen_y = self.world_y + camera_y
+        self.rect.topleft = (screen_x, screen_y)
         screen.blit(self.image, self.rect)
 
 
 class Grid:
-    # КЛАСС СОЗДАНИЯ ПОЛЯ
-
-    def __init__(self, step_x = 3, step_y = 3, screen_width = screen_width, screen_height = screen_height):
-
+    def __init__(self, step_x=3, step_y=3, screen_width=screen_width, screen_height=screen_height):
         self.house = []
 
         image1 = pygame.image.load("pic/house/castle.png")
@@ -101,49 +98,56 @@ class Grid:
 
         self.pos_x = -300
         self.pos_y = -300
+        self.camera_x = -300  # меняем название с pos_x на camera_x
+        self.camera_y = -300  # меняем название с pos_y на camera_y
 
-    def draw(self):
-        for info in self.house:
-            screen.blit(info['image'], info['rect'])
-            pygame.draw.rect(screen, (255, 255, 255), info['rect'], 2)
+    def get_camera_position(self):
+        """Возвращает текущие координаты камеры"""
+        return self.camera_x, self.camera_y
 
     def step(self):
         mouse_pos = pygame.mouse.get_pos()
         keys = pygame.key.get_pressed()
 
         # камера вправо
-        if (mouse_pos[0] >= self.screen_width - 2 or keys[pygame.K_RIGHT]) and self.pos_x >= self.screen_width - 2250:
-            self.pos_x -= self.step_x
+        if (mouse_pos[0] >= self.screen_width - 2 or keys[
+            pygame.K_RIGHT]) and self.camera_x >= self.screen_width - 2250:
+            self.camera_x -= self.step_x
             for build in self.house:
                 rect = pygame.Rect(build['rect'].x - self.step_x, build['rect'].y,
                                    build['rect'].width, build['rect'].height)
                 build['rect'] = rect
 
         # камера вниз
-        if (mouse_pos[1] >= self.screen_height - 2 or keys[pygame.K_DOWN]) and self.pos_y >= self.screen_height - 1400:
-            self.pos_y -= self.step_y
+        if (mouse_pos[1] >= self.screen_height - 2 or keys[pygame.K_DOWN]) and self.camera_y >= self.screen_height - 1400:
+            self.camera_y -= self.step_y
             for build in self.house:
                 rect = pygame.Rect(build['rect'].x, build['rect'].y - self.step_y,
                                    build['rect'].width, build['rect'].height)
                 build['rect'] = rect
 
         # камера влево
-        if (mouse_pos[0] <= 2 or keys[pygame.K_LEFT]) and self.pos_x <= self.screen_width - 1650:
-            self.pos_x += self.step_x
+        if (mouse_pos[0] <= 2 or keys[pygame.K_LEFT]) and self.camera_x <= self.screen_width - 1650:
+            self.camera_x += self.step_x
             for build in self.house:
                 rect = pygame.Rect(build['rect'].x + self.step_x, build['rect'].y,
                                    build['rect'].width, build['rect'].height)
                 build['rect'] = rect
 
         # камера вверх
-        if (mouse_pos[1] <= 2 or keys[pygame.K_UP]) and self.pos_y <= self.screen_height - 950:
-            self.pos_y += self.step_y
+        if (mouse_pos[1] <= 2 or keys[pygame.K_UP]) and self.camera_y <= self.screen_height - 950:
+            self.camera_y += self.step_y
             for build in self.house:
                 rect = pygame.Rect(build['rect'].x, build['rect'].y + self.step_y,
                                    build['rect'].width, build['rect'].height)
                 build['rect'] = rect
 
-        screen.blit(background, (self.pos_x, self.pos_y))
+        screen.blit(background, (self.camera_x, self.camera_y))
+
+    def draw(self):
+        for info in self.house:
+            screen.blit(info['image'], info['rect'])
+            pygame.draw.rect(screen, (255, 255, 255), info['rect'], 2)
 
 
 class Game:
@@ -158,9 +162,13 @@ class Game:
 
             for event in events:
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    mouse_pos = pygame.mouse.get_pos()
-                    print(mouse_pos)
-                    self.player.move(mouse_pos[0], mouse_pos[1])
+                    if event.button == 1:
+                        mouse_pos = pygame.mouse.get_pos()
+                        # Получаем мировые координаты (экранные + камера)
+                        camera_x, camera_y = self.grid.get_camera_position()
+                        world_x = mouse_pos[0] - camera_x
+                        world_y = mouse_pos[1] - camera_y
+                        self.player.set_target(world_x, world_y)
                 if event.type == pygame.QUIT:
                     self.running = False
                 elif event.type == pygame.KEYDOWN:
@@ -172,7 +180,11 @@ class Game:
             # Рисуем сетку
             self.grid.draw()
 
-            self.player.run()
+            self.player.move()
+            # Рисуем игрока с учетом камеры
+            camera_x, camera_y = self.grid.get_camera_position()
+            self.player.draw(screen, camera_x, camera_y)
+
             pygame.display.flip()
             clock.tick(60)
 
