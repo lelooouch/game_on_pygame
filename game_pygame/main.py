@@ -64,7 +64,44 @@ class Player:
 
         self.camera = camera
 
-    def move(self, buildings):
+        # Эффект клика
+        self.click_frames = []
+        for i in range(1, 9):
+            frame = pygame.image.load(f"anim/click/{i}.png")
+            self.click_frames.append(frame)
+
+        self.click_effects = []  # Список активных эффектов
+
+    def add_click_effect(self, x, y):
+        """Добавляет эффект клика в указанных координатах"""
+        self.click_effects.append({
+            'x': x,
+            'y': y,
+            'current_frame': 0,
+            'playing': True,
+            'animation_timer': 0,
+            'animation_speed': 0.06
+        })
+
+    def update_click_effects(self, dt):
+        """Обновляет все эффекты клика"""
+        for effect in self.click_effects[:]:
+            effect['animation_timer'] += dt
+            if effect['animation_timer'] >= effect['animation_speed']:
+                effect['animation_timer'] = 0
+                effect['current_frame'] += 1
+                if effect['current_frame'] >= len(self.click_frames):
+                    self.click_effects.remove(effect)
+
+    def draw_click_effects(self, screen):
+        """Рисует все эффекты клика"""
+        for effect in self.click_effects:
+            if effect['playing'] and effect['current_frame'] < len(self.click_frames):
+                screen.blit(self.click_frames[effect['current_frame']], (effect['x'], effect['y']))
+
+    def move(self, buildings, dt):
+        self.update_click_effects(dt)
+
         """Движение к цели с проверкой столкновения со зданиями"""
         if not self.moving:
             return
@@ -111,9 +148,13 @@ class Player:
         # Переводим экранные координаты в мировые
         world_x = x - camera_coord[0] - 35
         world_y = y - camera_coord[1] - 30
+
         self.target_x = world_x
         self.target_y = world_y
         self.moving = True
+
+        self.add_click_effect(x - 16, y)
+
 
     def draw(self, screen):
         """Рисует персонажа с учетом камеры"""
@@ -121,6 +162,9 @@ class Player:
 
         screen_x = self.world_x + camera_coord[0]
         screen_y = self.world_y + camera_coord[1]
+
+        self.draw_click_effects(screen)
+
         self.rect.topleft = (screen_x, screen_y)
         screen.blit(self.image, self.rect)
 
@@ -185,10 +229,15 @@ class Game:
         self.grid = Grid(self.camera)
         self.running = True
         self.player = Player(2050, 600, self.camera)
+        self.last_time = pygame.time.get_ticks()
 
 
     def run(self):
         while self.running:
+            current_time = pygame.time.get_ticks()
+            dt = (current_time - self.last_time) / 1000.0
+            self.last_time = current_time
+
             events = pygame.event.get()
 
             for event in events:
@@ -196,9 +245,7 @@ class Game:
                     if event.button == 1:
                         mouse_pos = pygame.mouse.get_pos()
                         # Получаем мировые координаты (экранные)
-                        world_x = mouse_pos[0]
-                        world_y = mouse_pos[1]
-                        self.player.set_target(world_x, world_y)
+                        self.player.set_target(mouse_pos[0], mouse_pos[1])
                 if event.type == pygame.QUIT:
                     self.running = False
                 elif event.type == pygame.KEYDOWN:
@@ -207,8 +254,9 @@ class Game:
 
 
             self.grid.draw()
+            self.player.move(self.grid.house, dt)
             self.player.draw(screen)
-            self.player.move(self.grid.house)
+
 
             pygame.display.flip()
             clock.tick(60)
