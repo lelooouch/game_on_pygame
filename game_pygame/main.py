@@ -107,12 +107,42 @@ class Player:
             return
 
         # Проверяем, не кликнули ли на здание
+        clicked_on_building = False
         for build in buildings:
-            # Уменьшаем хитбокс прямо в проверке (на 40 пикселей)
-            hitbox = build['rect'].inflate(-40, -40)
+            hitbox = build['rect'].inflate(-60, -60)
             if hitbox.collidepoint(self.target_x, self.target_y):
-                self.moving = False
-                return
+                clicked_on_building = True
+                break
+
+        # Если кликнули на здание, находим ближайшую точку перед ним
+        if clicked_on_building:
+            # Находим ближайшее здание к цели
+            closest_building = None
+            min_distance = float('inf')
+            for build in buildings:
+                hitbox = build['rect'].inflate(-60, -60)
+                if hitbox.collidepoint(self.target_x, self.target_y):
+                    # Вычисляем расстояние от игрока до здания
+                    building_center_x = hitbox.centerx
+                    building_center_y = hitbox.centery
+                    dist = ((building_center_x - self.world_x) ** 2 + (building_center_y - self.world_y) ** 2) ** 0.5
+                    if dist < min_distance:
+                        min_distance = dist
+                        closest_building = hitbox
+
+            if closest_building:
+                # Находим ближайшую точку к зданию
+                # Определяем направление от игрока к зданию
+                dx_to_building = closest_building.centerx - self.world_x
+                dy_to_building = closest_building.centery - self.world_y
+                distance_to_building = (dx_to_building ** 2 + dy_to_building ** 2) ** 0.5
+
+                # Ставим цель на расстоянии 50 пикселей перед зданием
+                if distance_to_building > 0:
+                    self.target_x = self.world_x + (dx_to_building / distance_to_building) * (distance_to_building - 50)
+                    self.target_y = self.world_y + (dy_to_building / distance_to_building) * (distance_to_building - 50)
+
+            clicked_on_building = False
 
         dx = self.target_x - self.world_x
         dy = self.target_y - self.world_y
@@ -136,6 +166,7 @@ class Player:
         for build in buildings:
             hitbox = build['rect'].inflate(-40, -40)
             if temp_rect.colliderect(hitbox):
+                # Если врезались, останавливаемся перед зданием
                 self.moving = False
                 return
 
@@ -184,7 +215,6 @@ class Grid:
         self.house.append(
             {
                 'rect': rect,
-                'visible': False,  # Невидимый прямоугольник (рисуется только при наведении)
                 'image': image1
             }
         )
@@ -196,8 +226,63 @@ class Grid:
         self.house.append(
             {
                 'rect': rect,
-                'visible': False,  # Невидимый прямоугольник (рисуется только при наведении)
                 'image': image2
+            }
+        )
+
+        rect = pygame.Rect(0, 0, screen_width + 1000, 150)
+        self.house.append(
+            {
+                'rect': rect,
+                'image': None
+            }
+        )
+
+        rect = pygame.Rect(0, screen_height + 400, screen_width + 1000, 150)
+        self.house.append(
+            {
+                'rect': rect,
+                'image': None
+            }
+        )
+
+        rect = pygame.Rect(0, 0, 240, screen_height + 1000)
+        self.house.append(
+            {
+                'rect': rect,
+                'image': None
+            }
+        )
+
+        rect = pygame.Rect(1865, 316, 130, 213) # правые руины
+        self.house.append(
+            {
+                'rect': rect,
+                'image': None
+            }
+        )
+
+        rect = pygame.Rect(1615, 460, 178, 60)
+        self.house.append(
+            {
+                'rect': rect,
+                'image': None
+            }
+        )
+
+        rect = pygame.Rect(720, 805, 220, 165)
+        self.house.append(
+            {
+                'rect': rect,
+                'image': None
+            }
+        )
+
+        rect = pygame.Rect(2020, 930, 90, 103)
+        self.house.append(
+            {
+                'rect': rect,
+                'image': None
             }
         )
 
@@ -219,8 +304,10 @@ class Grid:
                 build['rect'].height
             )
 
-            screen.blit(build['image'], self.draw_rect)
-            pygame.draw.rect(screen, (255, 255, 255), self.draw_rect, 2)
+            if build['image']:
+                screen.blit(build['image'], self.draw_rect)
+
+            # pygame.draw.rect(screen, (255, 255, 255), self.draw_rect, 2) # показать хитбоксы
 
 
 class Game:
