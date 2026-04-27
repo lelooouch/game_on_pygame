@@ -1,6 +1,8 @@
 import pygame
 import sys
 
+from base import *
+
 pygame.init()
 
 # Получаем размер экрана
@@ -199,6 +201,38 @@ class Player:
         self.rect.topleft = (screen_x, screen_y)
         screen.blit(self.image, self.rect)
 
+class NPC:
+    def __init__(self, name: str, anim: list, voiceline: list):
+        self.name = name
+        self.anim = anim  # список кадров анимации
+        self.voiceline = voiceline
+        self.current_frame = 0
+        self.animation_timer = 0
+        self.animation_speed = 0.3  # скорость анимации (секунд на кадр)
+        self.x = 0
+        self.y = 0
+
+    def set_position(self, x, y):
+        """Устанавливает позицию NPC"""
+        self.x = x
+        self.y = y
+
+    def update_animation(self, dt):
+        """Обновляет анимацию (вызывать каждый кадр)"""
+        self.animation_timer += dt
+        if self.animation_timer >= self.animation_speed:
+            self.animation_timer = 0
+            self.current_frame = (self.current_frame + 1) % len(self.anim)
+
+    def anim_draw(self, screen, camera_x=0, camera_y=0):
+        """Рисует анимацию NPC"""
+        if self.anim:
+            screen_x = self.x - camera_x
+            screen_y = self.y - camera_y
+            screen.blit(self.anim[self.current_frame], (screen_x, screen_y))
+
+
+
 
 class Grid:
     def __init__(self, camera, screen_width=screen_width, screen_height=screen_height):
@@ -312,11 +346,15 @@ class Grid:
 
 class Game:
     def __init__(self):
-        self.camera = Camera(-300, -300, screen_width, screen_height)
+        self.camera = Camera(-700, -200, screen_width, screen_height)
         self.grid = Grid(self.camera)
         self.running = True
         self.player = Player(2050, 600, self.camera)
         self.last_time = pygame.time.get_ticks()
+
+        #первый нпс
+        self.npc = NPC("Торговец", npc_frames, ["Привет!", "Что купим?"])
+        self.npc.set_position(500, 280)
 
 
     def run(self):
@@ -341,8 +379,13 @@ class Game:
 
 
             self.grid.draw()
+
+            self.npc.update_animation(dt)
+            self.npc.anim_draw(screen)
+
             self.player.move(self.grid.house, dt)
             self.player.draw(screen)
+
 
 
             pygame.display.flip()
