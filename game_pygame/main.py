@@ -202,7 +202,7 @@ class Player:
         screen.blit(self.image, self.rect)
 
 class NPC:
-    def __init__(self, name: str, anim: list, voiceline: list):
+    def __init__(self, name: str, anim: list, voiceline: list, camera):
         self.name = name
         self.anim = anim  # список кадров анимации
         self.voiceline = voiceline
@@ -211,6 +211,10 @@ class NPC:
         self.animation_speed = 0.3  # скорость анимации (секунд на кадр)
         self.x = 0
         self.y = 0
+
+        self.camera = camera
+
+        self.near_player = False
 
     def set_position(self, x, y):
         """Устанавливает позицию NPC"""
@@ -224,12 +228,31 @@ class NPC:
             self.animation_timer = 0
             self.current_frame = (self.current_frame + 1) % len(self.anim)
 
-    def anim_draw(self, screen, camera_x=0, camera_y=0):
+    def anim_draw(self, screen):
         """Рисует анимацию NPC"""
+        camera_coord = self.camera.step()
+
         if self.anim:
-            screen_x = self.x - camera_x
-            screen_y = self.y - camera_y
+            screen_x = self.x + camera_coord[0]
+            screen_y = self.y + camera_coord[1]
             screen.blit(self.anim[self.current_frame], (screen_x, screen_y))
+
+            # Квадрат вокруг NPC
+            square_size = 200
+            self.npc_square = pygame.Rect(
+                screen_x + (new_width // 2) - (square_size // 2),
+                screen_y + (new_height // 2) - (square_size // 2),
+                square_size,
+                square_size
+            )
+            pygame.draw.rect(screen, (255, 255, 255), self.npc_square, 2)
+
+    def near(self, x, y):
+        camera_coord = self.camera.step()
+
+        if self.npc_square.collidepoint(x - camera_coord[0] - 700, y - camera_coord[1] - 200):
+            print(1)
+
 
 
 
@@ -320,6 +343,14 @@ class Grid:
             }
         )
 
+        rect = pygame.Rect(1100, 430, 90, 90) #npc
+        self.house.append(
+            {
+                'rect': rect,
+                'image': None
+            }
+        )
+
         self.screen_width = screen_width
         self.screen_height = screen_height
 
@@ -353,8 +384,8 @@ class Game:
         self.last_time = pygame.time.get_ticks()
 
         #первый нпс
-        self.npc = NPC("Торговец", npc_frames, ["Привет!", "Что купим?"])
-        self.npc.set_position(500, 280)
+        self.npc = NPC("Торговец", npc_frames, ["Привет!", "Что купим?"], self.camera)
+        self.npc.set_position(1100, 430)
 
 
     def run(self):
@@ -371,6 +402,7 @@ class Game:
                         mouse_pos = pygame.mouse.get_pos()
                         # Получаем мировые координаты (экранные)
                         self.player.set_target(mouse_pos[0], mouse_pos[1])
+                        self.npc.near(mouse_pos[0], mouse_pos[1])
                 if event.type == pygame.QUIT:
                     self.running = False
                 elif event.type == pygame.KEYDOWN:
@@ -385,7 +417,6 @@ class Game:
 
             self.player.move(self.grid.house, dt)
             self.player.draw(screen)
-
 
 
             pygame.display.flip()
