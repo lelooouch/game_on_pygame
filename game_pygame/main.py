@@ -253,6 +253,10 @@ class NPC:
             )
             #pygame.draw.rect(screen, (255, 255, 255), self.npc_square, 2)
 
+       # def voice():
+
+
+
     def near(self, x, y):
         if self.npc_square and self.npc_square.collidepoint(x, y):
             return True
@@ -262,17 +266,37 @@ class NPC:
 class Tips:
     def __init__(self, camera, npc):
         self.camera = camera
-        self.image_E = pygame.image.load('pic/button/button_E.png')
-        self.image_E = pygame.transform.scale(self.image_E, (30, 30))
+        # Загружаем два кадра для анимации
+        self.image_E_1 = pygame.image.load('pic/button/button_E_1.png')
+        self.image_E_1 = pygame.transform.scale(self.image_E_1, (30, 30))
+        self.image_E_2 = pygame.image.load('pic/button/button_E_2.png')
+        self.image_E_2 = pygame.transform.scale(self.image_E_2, (30, 30))
+
+        self.current_frame = 0
+        self.animation_timer = 0
+        self.animation_speed = 0.3  # скорость анимации
         self.npc = npc
+
+    def update_animation(self):
+        """Обновляет анимацию кнопки"""
+        self.animation_timer += 0.02
+        if self.animation_timer >= self.animation_speed:
+            self.animation_timer = 0
+            self.current_frame = (self.current_frame + 1) % 2
 
     def draw_E(self, screen, near):
         if near:
+            self.update_animation()
+
             camera_coord = self.camera.step()
-            # Рисуем над NPC
             screen_x = self.npc.x + camera_coord[0] + 33
             screen_y = self.npc.y + camera_coord[1] - 23
-            screen.blit(self.image_E, (screen_x, screen_y))
+
+            # Рисуем текущий кадр
+            if self.current_frame == 0:
+                screen.blit(self.image_E_1, (screen_x, screen_y))
+            else:
+                screen.blit(self.image_E_2, (screen_x, screen_y))
 
 
 
