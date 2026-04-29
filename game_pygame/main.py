@@ -216,6 +216,7 @@ class NPC:
 
         self.near_player = False
 
+
     def set_position(self, x, y):
         """Устанавливает позицию NPC"""
         self.x = x
@@ -235,25 +236,43 @@ class NPC:
         if self.anim:
             screen_x = self.x + camera_coord[0]
             screen_y = self.y + camera_coord[1]
-            screen.blit(self.anim[self.current_frame], (screen_x, screen_y))
+
+            frame = self.anim[self.current_frame]
+            frame_width = frame.get_width()
+            frame_height = frame.get_height()
+
+            screen.blit(frame, (screen_x, screen_y))
 
             # Квадрат вокруг NPC
-            square_size = 200
+            square_size = 100
             self.npc_square = pygame.Rect(
-                screen_x + (new_width // 2) - (square_size // 2),
-                screen_y + (new_height // 2) - (square_size // 2),
+                screen_x + (frame_width // 2) - (square_size // 2),
+                screen_y + (frame_height // 2) - (square_size // 2),
                 square_size,
                 square_size
             )
-            pygame.draw.rect(screen, (255, 255, 255), self.npc_square, 2)
+            #pygame.draw.rect(screen, (255, 255, 255), self.npc_square, 2)
 
     def near(self, x, y):
-        camera_coord = self.camera.step()
+        if self.npc_square and self.npc_square.collidepoint(x, y):
+            return True
+        return False
 
-        if self.npc_square.collidepoint(x - camera_coord[0] - 700, y - camera_coord[1] - 200):
-            print(1)
 
+class Tips:
+    def __init__(self, camera, npc):
+        self.camera = camera
+        self.image_E = pygame.image.load('pic/button/button_E.png')
+        self.image_E = pygame.transform.scale(self.image_E, (30, 30))
+        self.npc = npc
 
+    def draw_E(self, screen, near):
+        if near:
+            camera_coord = self.camera.step()
+            # Рисуем над NPC
+            screen_x = self.npc.x + camera_coord[0] + 33
+            screen_y = self.npc.y + camera_coord[1] - 23
+            screen.blit(self.image_E, (screen_x, screen_y))
 
 
 
@@ -387,6 +406,11 @@ class Game:
         self.npc = NPC("Торговец", npc_frames, ["Привет!", "Что купим?"], self.camera)
         self.npc.set_position(1100, 430)
 
+        self.tips = Tips(self.camera, self.npc)
+
+        self.pos_x = 0
+        self.pos_y = 0
+        self.flag = False
 
     def run(self):
         while self.running:
@@ -395,20 +419,18 @@ class Game:
             self.last_time = current_time
 
             events = pygame.event.get()
+            mouse_pos = pygame.mouse.get_pos()
 
             for event in events:
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     if event.button == 1:
-                        mouse_pos = pygame.mouse.get_pos()
-                        # Получаем мировые координаты (экранные)
                         self.player.set_target(mouse_pos[0], mouse_pos[1])
-                        self.npc.near(mouse_pos[0], mouse_pos[1])
+
                 if event.type == pygame.QUIT:
                     self.running = False
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         self.running = False
-
 
             self.grid.draw()
 
@@ -418,6 +440,12 @@ class Game:
             self.player.move(self.grid.house, dt)
             self.player.draw(screen)
 
+            # Проверяем, рядом ли игрок с NPC
+            player_screen_x = self.player.world_x + self.camera.step()[0]
+            player_screen_y = self.player.world_y + self.camera.step()[1]
+            near_npc = self.npc.near(player_screen_x, player_screen_y)
+
+            self.tips.draw_E(screen, near_npc)
 
             pygame.display.flip()
             clock.tick(60)
