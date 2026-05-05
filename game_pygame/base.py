@@ -10,4 +10,11 @@ for i in range(1, 3):
     frame = pygame.transform.scale(frame, (new_width, new_height))
     npc_frames.append(frame)
 
+first_npc = {
+    'picture': 'pic/1_npc/diolog_first_npc.jpg',
+    'voiceline': ['Как тебя зовут странник?', '...', 'Вижу, не хочешь отвечать.',
+                  'Если хочешь узнать откуда пришла чума, то тебе следует заглянуть в старый замок.',
+                  'Но берегись, слабым там не место...']
+}
+
 
