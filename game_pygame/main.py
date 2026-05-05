@@ -214,7 +214,6 @@ class NPC:
         self.y = 0
         self.camera = camera
         self.near_player = False
-        self.was_interaction = True
         self.is_interactive = False
 
         # ⚙️ Состояние диалога
@@ -223,8 +222,8 @@ class NPC:
         self.char_idx = 0
         self.last_tick = 0
         self.pause_start = None
-        self.char_delay = 40       # мс на одну букву
-        self.pause_delay = 1000    # мс паузы после конца строки
+        self.char_delay = 60       # мс на одну букву
+        self.pause_delay = 3000    # мс паузы после конца строки
 
         self.font = pygame.font.Font("fonts/diolog.ttf", 20)
 
@@ -284,9 +283,9 @@ class NPC:
         now = pygame.time.get_ticks()
         lines = self.dialog_data['voiceline']
 
-        # 🎮 Пропуск анимации или закрытие диалога по E / Space
+        # 🎮 Пропуск анимации или закрытие диалога по Space
         for event in events:
-            if event.type == pygame.KEYDOWN and event.key in (pygame.K_e, pygame.K_SPACE):
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                 if self.char_idx < len(lines[self.line_idx]):
                     self.char_idx = len(lines[self.line_idx])
                     self.pause_start = 0  # Мгновенно переходим к паузе
@@ -317,11 +316,9 @@ class NPC:
     def close_dialog(self):
         self.dialog_active = False
         self.is_interactive = False
-        self.was_interaction = True  # Разрешаем начать диалог заново
 
     def interaction(self):
-        if self.near_player and pygame.key.get_pressed()[pygame.K_e] and self.was_interaction:
-            self.was_interaction = False
+        if self.near_player and pygame.key.get_pressed()[pygame.K_e]:
             self.start_dialog()
 
     def draw_dialog(self, screen):
@@ -335,7 +332,7 @@ class NPC:
             visible_text = lines[self.line_idx][:self.char_idx]
             if visible_text:
                 text_surface = self.font.render(visible_text, True, (255, 255, 255))
-                text_rect = text_surface.get_rect(center=(700, 700))
+                text_rect = text_surface.get_rect(center=(800, 670))
                 screen.blit(text_surface, text_rect)
 
     def near(self, x, y):
