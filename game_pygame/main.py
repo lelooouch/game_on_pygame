@@ -2,7 +2,6 @@ import pygame
 import sys
 
 from base import *
-from for_npc import *
 
 pygame.init()
 
@@ -214,11 +213,11 @@ class NPC:
         self.y = 0
 
         self.camera = camera
-        self.dialog = InteractionDialog(dialog_data)
 
         self.near_player = False
 
         self.was_interaction = True
+        self.is_interactive = False
 
 
     def set_position(self, x, y):
@@ -260,8 +259,15 @@ class NPC:
     def interaction(self):
         if self.near_player and pygame.key.get_pressed()[pygame.K_e] and self.was_interaction:
             self.was_interaction = False
+            self.is_interactive = True
+            # Загружаем картинку один раз
+            self.dialog_image = pygame.image.load(self.dialog_data['picture'])
+            self.dialog_image = pygame.transform.scale(self.dialog_image, (screen_width, screen_height))
 
-            screen.blit(self.dialog_data['picture'], (0, 0))
+    def draw_dialog(self, screen):
+        if self.is_interactive:
+            screen.blit(self.dialog_image, (0, 0))
+            pygame.display.flip()
 
     def near(self, x, y):
         if self.npc_square and self.npc_square.collidepoint(x, y):
@@ -464,21 +470,20 @@ class Game:
                     if event.key == pygame.K_ESCAPE:
                         self.running = False
 
-            self.grid.draw()
+            if not self.npc.is_interactive:
+                self.grid.draw()
+                self.npc.update_animation(dt)
+                self.npc.anim_draw(screen)
+                self.player.move(self.grid.house, dt)
+                self.player.draw(screen)
 
-            self.npc.update_animation(dt)
-            self.npc.anim_draw(screen)
-
-            self.player.move(self.grid.house, dt)
-            self.player.draw(screen)
-
-            # Проверяем, рядом ли игрок с NPC
-            player_screen_x = self.player.world_x + self.camera.step()[0]
-            player_screen_y = self.player.world_y + self.camera.step()[1]
-            near_npc = self.npc.near(player_screen_x, player_screen_y)
-            self.npc.interaction()
-
-            self.tips.draw_E(screen, near_npc)
+                player_screen_x = self.player.world_x + self.camera.step()[0]
+                player_screen_y = self.player.world_y + self.camera.step()[1]
+                near_npc = self.npc.near(player_screen_x, player_screen_y)
+                self.npc.interaction()
+                self.tips.draw_E(screen, near_npc)
+            else:
+                self.npc.draw_dialog(screen)
 
             pygame.display.flip()
             clock.tick(60)
