@@ -2,6 +2,7 @@ import pygame
 import sys
 
 from base import *
+from for_npc import *
 
 pygame.init()
 
@@ -202,10 +203,10 @@ class Player:
         screen.blit(self.image, self.rect)
 
 class NPC:
-    def __init__(self, name: str, anim: list, voiceline: list, camera):
+    def __init__(self, name: str, anim: list, dialog_data: dict, camera):
         self.name = name
         self.anim = anim  # список кадров анимации
-        self.voiceline = voiceline
+        self.dialog_data = dialog_data
         self.current_frame = 0
         self.animation_timer = 0
         self.animation_speed = 0.3  # скорость анимации (секунд на кадр)
@@ -213,8 +214,11 @@ class NPC:
         self.y = 0
 
         self.camera = camera
+        self.dialog = InteractionDialog(dialog_data)
 
         self.near_player = False
+
+        self.was_interaction = True
 
 
     def set_position(self, x, y):
@@ -253,13 +257,17 @@ class NPC:
             )
             #pygame.draw.rect(screen, (255, 255, 255), self.npc_square, 2)
 
-       # def voice():
+    def interaction(self):
+        if self.near_player and pygame.key.get_pressed()[pygame.K_e] and self.was_interaction:
+            self.was_interaction = False
 
-
+            screen.blit(self.dialog_data['picture'], (0, 0))
 
     def near(self, x, y):
         if self.npc_square and self.npc_square.collidepoint(x, y):
+            self.near_player = True
             return True
+        self.near_player = False
         return False
 
 
@@ -427,7 +435,7 @@ class Game:
         self.last_time = pygame.time.get_ticks()
 
         #первый нпс
-        self.npc = NPC("Торговец", npc_frames, ["Привет!", "Что купим?"], self.camera)
+        self.npc = NPC("Торговец", npc_frames, {'picture': 'pic/1_npc/diolog_first_npc.jpg'}, self.camera)
         self.npc.set_position(1100, 430)
 
         self.tips = Tips(self.camera, self.npc)
@@ -468,6 +476,7 @@ class Game:
             player_screen_x = self.player.world_x + self.camera.step()[0]
             player_screen_y = self.player.world_y + self.camera.step()[1]
             near_npc = self.npc.near(player_screen_x, player_screen_y)
+            self.npc.interaction()
 
             self.tips.draw_E(screen, near_npc)
 
