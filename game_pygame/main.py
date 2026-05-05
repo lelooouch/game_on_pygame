@@ -204,20 +204,29 @@ class Player:
 class NPC:
     def __init__(self, name: str, anim: list, dialog_data: dict, camera):
         self.name = name
-        self.anim = anim  # список кадров анимации
+        self.anim = anim
         self.dialog_data = dialog_data
+
         self.current_frame = 0
         self.animation_timer = 0
-        self.animation_speed = 0.3  # скорость анимации (секунд на кадр)
+        self.animation_speed = 0.3
         self.x = 0
         self.y = 0
-
         self.camera = camera
-
         self.near_player = False
-
         self.was_interaction = True
         self.is_interactive = False
+
+        # ⚙️ Состояние диалога
+        self.dialog_active = False
+        self.line_idx = 0
+        self.char_idx = 0
+        self.last_tick = 0
+        self.pause_start = None
+        self.char_delay = 40       # мс на одну букву
+        self.pause_delay = 1000    # мс паузы после конца строки
+
+        self.font = pygame.font.Font("fonts/diolog.ttf", 20)
 
 
     def set_position(self, x, y):
@@ -256,18 +265,78 @@ class NPC:
             )
             #pygame.draw.rect(screen, (255, 255, 255), self.npc_square, 2)
 
+    def start_dialog(self):
+        # Загружаем и масштабируем фон
+        self.dialog_image = pygame.image.load(self.dialog_data['picture'])
+        self.dialog_image = pygame.transform.scale(self.dialog_image, (screen_width, screen_height))
+
+        self.dialog_active = True
+        self.is_interactive = True
+        self.line_idx = 0
+        self.char_idx = 0
+        self.last_tick = pygame.time.get_ticks()
+        self.pause_start = None
+
+    def update_dialog(self, events):
+        if not self.dialog_active:
+            return
+
+        now = pygame.time.get_ticks()
+        lines = self.dialog_data['voiceline']
+
+        # 🎮 Пропуск анимации или закрытие диалога по E / Space
+        for event in events:
+            if event.type == pygame.KEYDOWN and event.key in (pygame.K_e, pygame.K_SPACE):
+                if self.char_idx < len(lines[self.line_idx]):
+                    self.char_idx = len(lines[self.line_idx])
+                    self.pause_start = 0  # Мгновенно переходим к паузе
+                else:
+                    self.close_dialog()
+                return
+
+        # Защита от выхода за границы
+        if self.line_idx >= len(lines):
+            self.close_dialog()
+            return
+
+        # 🔤 Фаза печати
+        if self.char_idx < len(lines[self.line_idx]):
+            if now - self.last_tick >= self.char_delay:
+                self.char_idx += 1
+                self.last_tick = now
+        # ⏸ Фаза паузы
+        else:
+            if self.pause_start is None:
+                self.pause_start = now
+            elif now - self.pause_start >= self.pause_delay:
+                self.line_idx += 1
+                self.char_idx = 0
+                self.last_tick = now
+                self.pause_start = None
+
+    def close_dialog(self):
+        self.dialog_active = False
+        self.is_interactive = False
+        self.was_interaction = True  # Разрешаем начать диалог заново
+
     def interaction(self):
         if self.near_player and pygame.key.get_pressed()[pygame.K_e] and self.was_interaction:
             self.was_interaction = False
-            self.is_interactive = True
-            # Загружаем картинку один раз
-            self.dialog_image = pygame.image.load(self.dialog_data['picture'])
-            self.dialog_image = pygame.transform.scale(self.dialog_image, (screen_width, screen_height))
+            self.start_dialog()
 
     def draw_dialog(self, screen):
-        if self.is_interactive:
-            screen.blit(self.dialog_image, (0, 0))
-            pygame.display.flip()
+        if not self.dialog_active:
+            return
+
+        screen.blit(self.dialog_image, (0, 0))
+        lines = self.dialog_data['voiceline']
+        if self.line_idx < len(lines):
+            # Рисуем только напечатанную часть текущей строки
+            visible_text = lines[self.line_idx][:self.char_idx]
+            if visible_text:
+                text_surface = self.font.render(visible_text, True, (255, 255, 255))
+                text_rect = text_surface.get_rect(center=(700, 700))
+                screen.blit(text_surface, text_rect)
 
     def near(self, x, y):
         if self.npc_square and self.npc_square.collidepoint(x, y):
@@ -440,15 +509,11 @@ class Game:
         self.player = Player(2050, 600, self.camera)
         self.last_time = pygame.time.get_ticks()
 
-        #первый нпс
-        self.npc = NPC("Торговец", npc_frames, {'picture': 'pic/1_npc/diolog_first_npc.jpg'}, self.camera)
+        self.npc = NPC("Торговец", npc_frames, first_npc, self.camera)
         self.npc.set_position(1100, 430)
 
         self.tips = Tips(self.camera, self.npc)
-
-        self.pos_x = 0
-        self.pos_y = 0
-        self.flag = False
+        # ... остальной код init ...
 
     def run(self):
         while self.running:
@@ -460,15 +525,15 @@ class Game:
             mouse_pos = pygame.mouse.get_pos()
 
             for event in events:
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    if event.button == 1:
-                        self.player.set_target(mouse_pos[0], mouse_pos[1])
-
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    self.player.set_target(mouse_pos[0], mouse_pos[1])
                 if event.type == pygame.QUIT:
                     self.running = False
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE:
-                        self.running = False
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    self.running = False
+
+            # 🆕 Обновляем логику диалога КАЖДЫЙ кадр
+            self.npc.update_dialog(events)
 
             if not self.npc.is_interactive:
                 self.grid.draw()
