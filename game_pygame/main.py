@@ -283,27 +283,25 @@ class NPC:
         now = pygame.time.get_ticks()
         lines = self.dialog_data['voiceline']
 
-        # 🎮 Пропуск анимации или закрытие диалога по Space
-        for event in events:
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
-                if self.char_idx < len(lines[self.line_idx]):
-                    self.char_idx = len(lines[self.line_idx])
-                    self.pause_start = 0  # Мгновенно переходим к паузе
-                else:
-                    self.close_dialog()
-                return
-
-        # Защита от выхода за границы
+        # 🛡️ Сначала проверяем: закончились ли строки?
         if self.line_idx >= len(lines):
             self.close_dialog()
             return
+
+        # 🎮 Пропуск анимации или закрытие диалога по Space
+        for event in events:
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                # Дорисовываем текущую строку мгновенно
+                self.char_idx = len(lines[self.line_idx])
+                self.pause_start = 0  # Мгновенно переходим к паузе
+                return
 
         # 🔤 Фаза печати
         if self.char_idx < len(lines[self.line_idx]):
             if now - self.last_tick >= self.char_delay:
                 self.char_idx += 1
                 self.last_tick = now
-        # ⏸ Фаза паузы
+        # ⏸ Фаза паузы после окончания строки
         else:
             if self.pause_start is None:
                 self.pause_start = now
@@ -326,14 +324,58 @@ class NPC:
             return
 
         screen.blit(self.dialog_image, (0, 0))
+
         lines = self.dialog_data['voiceline']
-        if self.line_idx < len(lines):
-            # Рисуем только напечатанную часть текущей строки
-            visible_text = lines[self.line_idx][:self.char_idx]
-            if visible_text:
-                text_surface = self.font.render(visible_text, True, (255, 255, 255))
-                text_rect = text_surface.get_rect(center=(800, 670))
-                screen.blit(text_surface, text_rect)
+        if self.line_idx >= len(lines):
+            return
+
+        # Берём только напечатанную часть текущей строки
+        visible_text = lines[self.line_idx][:self.char_idx]
+        if not visible_text:
+            return
+
+        # ⚙️ Фиксированная максимальная ширина в пикселях
+        max_width = 900
+
+        # 📝 Встроенный алгоритм переноса по словам
+        words = visible_text.split()
+        wrapped_lines = []
+        current_line = ""
+
+        for word in words:
+            test_line = f"{current_line} {word}".strip()
+            if self.font.size(test_line)[0] <= max_width:
+                current_line = test_line
+            else:
+                if current_line:
+                    wrapped_lines.append(current_line)
+                # Если одно слово длиннее max_width, разбиваем его по символам
+                if self.font.size(word)[0] > max_width:
+                    char_line = ""
+                    for char in word:
+                        test_char = char_line + char
+                        if self.font.size(test_char)[0] <= max_width:
+                            char_line = test_char
+                        else:
+                            if char_line:
+                                wrapped_lines.append(char_line)
+                            char_line = char
+                    current_line = char_line
+                else:
+                    current_line = word
+
+        if current_line:
+            wrapped_lines.append(current_line)
+
+        # 📐 Вычисляем позицию для вертикального центрирования
+        line_height = self.font.get_height()
+        start_y = 670 - (len(wrapped_lines) * line_height) // 2
+
+        # 🖼️ Отрисовка каждой строки
+        for i, line in enumerate(wrapped_lines):
+            text_surface = self.font.render(line, True, (255, 255, 255))
+            text_rect = text_surface.get_rect(center=(800, start_y + i * line_height))
+            screen.blit(text_surface, text_rect)
 
     def near(self, x, y):
         if self.npc_square and self.npc_square.collidepoint(x, y):
