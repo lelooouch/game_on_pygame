@@ -54,39 +54,65 @@ class Camera:
 
 class Player:
     def __init__(self, x, y, camera):
-        # Мировые координаты (на карте)
+        # Мировые координаты
         self.world_x = x
         self.world_y = y
         self.speed = 3
         self.moving = False
 
-        # Загружаем картинку человечка
-        self.image = pygame.image.load("pic/2.png")
-        self.rect = self.image.get_rect()
-
         self.camera = camera
 
-        # Эффект клика
+        # 🎭 Загрузка спрайтов для 4 направлений
+        # Формат: "anim/player/{direction}/{frame}.png"
+        # direction: 'up', 'down', 'left', 'right'
+        self.sprites = {}
+        for direction in ['up', 'down', 'left', 'right']:
+            frames = []
+            frame_id = 1
+            while True:
+                try:
+                    frame = pygame.image.load(f"anim/character/{direction}/{frame_id}.png")
+                    new_width = int(frame.get_width() * 0.75)
+                    new_height = int(frame.get_height() * 0.75)
+                    frame = pygame.transform.scale(frame, (new_width, new_height))
+                    frames.append(frame)
+                    frame_id += 1
+                except FileNotFoundError:
+                    break
+            if frames:
+                self.sprites[direction] = frames
+
+        # Текущее состояние анимации
+        self.direction = 'down'  # направление по умолчанию
+        self.current_frame = 0
+        self.animation_timer = 0
+        self.animation_speed = 0.06  # секунд на кадр (меньше = быстрее)
+
+        # Хитбокс (возьмём размер из первого загруженного спрайта)
+        if self.sprites:
+            first_sprite = next(iter(self.sprites.values()))[0]
+            self.rect = first_sprite.get_rect()
+        else:
+            self.rect = pygame.Rect(0, 0, 32, 32)  # фолбэк
+
+        # Эффект клика (ваш существующий код)
         self.click_frames = []
         for i in range(1, 9):
-            frame = pygame.image.load(f"anim/click/{i}.png")
-            self.click_frames.append(frame)
+            try:
+                frame = pygame.image.load(f"anim/click/{i}.png")
+                self.click_frames.append(frame)
+            except FileNotFoundError:
+                break
 
-        self.click_effects = []  # Список активных эффектов
+        self.click_effects = []
 
     def add_click_effect(self, x, y):
-        """Добавляет эффект клика в указанных координатах"""
         self.click_effects.append({
-            'x': x,
-            'y': y,
-            'current_frame': 0,
-            'playing': True,
-            'animation_timer': 0,
-            'animation_speed': 0.06
+            'x': x, 'y': y, 'current_frame': 0,
+            'playing': True, 'animation_timer': 0, 'animation_speed': 0.06
         })
 
     def update_click_effects(self, dt):
-        """Обновляет все эффекты клика"""
         for effect in self.click_effects[:]:
             effect['animation_timer'] += dt
             if effect['animation_timer'] >= effect['animation_speed']:
@@ -96,19 +122,36 @@ class Player:
                     self.click_effects.remove(effect)
 
     def draw_click_effects(self, screen):
-        """Рисует все эффекты клика"""
         for effect in self.click_effects:
             if effect['playing'] and effect['current_frame'] < len(self.click_frames):
                 screen.blit(self.click_frames[effect['current_frame']], (effect['x'], effect['y']))
 
+    def _get_direction(self, dx, dy):
+        """Определяет направление движения по вектору"""
+        if abs(dx) > abs(dy):
+            return 'right' if dx > 0 else 'left'
+        else:
+            return 'down' if dy > 0 else 'up'
+
+    def _update_animation(self, dt, is_moving):
+        """Обновляет кадр анимации"""
+        if is_moving and self.direction in self.sprites:
+            self.animation_timer += dt
+            if self.animation_timer >= self.animation_speed:
+                self.animation_timer = 0
+                self.current_frame = (self.current_frame + 1) % len(self.sprites[self.direction])
+        elif not is_moving:
+            # При остановке сбрасываем на первый кадр текущего направления
+            self.current_frame = 0
+
     def move(self, buildings, dt):
         self.update_click_effects(dt)
 
-        """Движение к цели с проверкой столкновения со зданиями"""
         if not self.moving:
+            self._update_animation(dt, is_moving=False)
             return
 
-        # Проверяем, не кликнули ли на здание
+        # === Логика движения (ваша, без изменений) ===
         clicked_on_building = False
         for build in buildings:
             hitbox = build['rect'].inflate(-60, -60)
@@ -116,15 +159,12 @@ class Player:
                 clicked_on_building = True
                 break
 
-        # Если кликнули на здание, находим ближайшую точку перед ним
         if clicked_on_building:
-            # Находим ближайшее здание к цели
             closest_building = None
             min_distance = float('inf')
             for build in buildings:
                 hitbox = build['rect'].inflate(-60, -60)
                 if hitbox.collidepoint(self.target_x, self.target_y):
-                    # Вычисляем расстояние от игрока до здания
                     building_center_x = hitbox.centerx
                     building_center_y = hitbox.centery
                     dist = ((building_center_x - self.world_x) ** 2 + (building_center_y - self.world_y) ** 2) ** 0.5
@@ -133,17 +173,12 @@ class Player:
                         closest_building = hitbox
 
             if closest_building:
-                # Находим ближайшую точку к зданию
-                # Определяем направление от игрока к зданию
                 dx_to_building = closest_building.centerx - self.world_x
                 dy_to_building = closest_building.centery - self.world_y
                 distance_to_building = (dx_to_building ** 2 + dy_to_building ** 2) ** 0.5
-
-                # Ставим цель на расстоянии 50 пикселей перед зданием
                 if distance_to_building > 0:
                     self.target_x = self.world_x + (dx_to_building / distance_to_building) * (distance_to_building - 50)
                     self.target_y = self.world_y + (dy_to_building / distance_to_building) * (distance_to_building - 50)
-
             clicked_on_building = False
 
         dx = self.target_x - self.world_x
@@ -154,52 +189,56 @@ class Player:
             self.world_x = self.target_x
             self.world_y = self.target_y
             self.moving = False
+            self._update_animation(dt, is_moving=False)
             return
 
         step_x = (dx / distance) * self.speed
         step_y = (dy / distance) * self.speed
 
+        # 🎯 Определяем направление ДО перемещения
+        self.direction = self._get_direction(dx, dy)
+
         new_x = self.world_x + step_x
         new_y = self.world_y + step_y
-
         temp_rect = pygame.Rect(new_x, new_y, self.rect.width, self.rect.height)
 
-        # Проверяем столкновение с уменьшенным хитбоксом
         for build in buildings:
             hitbox = build['rect'].inflate(-40, -40)
             if temp_rect.colliderect(hitbox):
-                # Если врезались, останавливаемся перед зданием
                 self.moving = False
+                self._update_animation(dt, is_moving=False)
                 return
 
         self.world_x = new_x
         self.world_y = new_y
 
+        # 🎬 Обновляем анимацию только если движемся
+        self._update_animation(dt, is_moving=True)
+
     def set_target(self, x, y):
-        """Устанавливает цель для движения (экранные координаты)"""
         camera_coord = self.camera.step()
-        # Переводим экранные координаты в мировые
         world_x = x - camera_coord[0] - 35
         world_y = y - camera_coord[1] - 30
 
         self.target_x = world_x
         self.target_y = world_y
         self.moving = True
-
         self.add_click_effect(x - 16, y)
 
-
     def draw(self, screen):
-        """Рисует персонажа с учетом камеры"""
         camera_coord = self.camera.step()
-
         screen_x = self.world_x + camera_coord[0]
         screen_y = self.world_y + camera_coord[1]
 
         self.draw_click_effects(screen)
 
-        self.rect.topleft = (screen_x, screen_y)
-        screen.blit(self.image, self.rect)
+        # 🖼️ Рисуем текущий кадр анимации для текущего направления
+        if self.direction in self.sprites and self.sprites[self.direction]:
+            current_sprite = self.sprites[self.direction][self.current_frame]
+            screen.blit(current_sprite, (screen_x, screen_y))
+        else:
+            # Фолбэк: если спрайты не загрузились
+            pygame.draw.rect(screen, (255, 0, 0), (screen_x, screen_y, 32, 32))
 
 class NPC:
     def __init__(self, name: str, anim: list, dialog_data: dict, camera):
@@ -419,7 +458,6 @@ class Tips:
                 screen.blit(self.image_E_1, (screen_x, screen_y))
             else:
                 screen.blit(self.image_E_2, (screen_x, screen_y))
-
 
 
 class Grid:
