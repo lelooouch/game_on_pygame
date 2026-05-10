@@ -86,7 +86,7 @@ class Player:
         self.direction = 'down'  # направление по умолчанию
         self.current_frame = 0
         self.animation_timer = 0
-        self.animation_speed = 0.06  # секунд на кадр (меньше = быстрее)
+        self.animation_speed = 0.08  # секунд на кадр (меньше = быстрее)
 
         # Хитбокс (возьмём размер из первого загруженного спрайта)
         if self.sprites:
@@ -134,15 +134,17 @@ class Player:
             return 'down' if dy > 0 else 'up'
 
     def _update_animation(self, dt, is_moving):
-        """Обновляет кадр анимации"""
-        if is_moving and self.direction in self.sprites:
+        """Обновляет кадр анимации с защитой от выхода за границы"""
+        if is_moving and self.direction in self.sprites and self.sprites[self.direction]:
             self.animation_timer += dt
             if self.animation_timer >= self.animation_speed:
                 self.animation_timer = 0
-                self.current_frame = (self.current_frame + 1) % len(self.sprites[self.direction])
+                frames_count = len(self.sprites[self.direction])
+                self.current_frame = (self.current_frame + 1) % frames_count
         elif not is_moving:
-            # При остановке сбрасываем на первый кадр текущего направления
-            self.current_frame = 0
+            # При остановке сбрасываем на первый кадр, но только если спрайты есть
+            if self.direction in self.sprites and self.sprites[self.direction]:
+                self.current_frame = 0
 
     def move(self, buildings, dt):
         self.update_click_effects(dt)
@@ -226,19 +228,27 @@ class Player:
         self.add_click_effect(x - 16, y)
 
     def draw(self, screen):
+        """Рисует персонажа с учетом камеры и защитой от ошибок"""
         camera_coord = self.camera.step()
         screen_x = self.world_x + camera_coord[0]
         screen_y = self.world_y + camera_coord[1]
 
         self.draw_click_effects(screen)
 
-        # 🖼️ Рисуем текущий кадр анимации для текущего направления
-        if self.direction in self.sprites and self.sprites[self.direction]:
+        # 🛡️ Безопасное получение текущего спрайта
+        if (self.direction in self.sprites and
+                self.sprites[self.direction] and
+                0 <= self.current_frame < len(self.sprites[self.direction])):
+
             current_sprite = self.sprites[self.direction][self.current_frame]
             screen.blit(current_sprite, (screen_x, screen_y))
         else:
-            # Фолбэк: если спрайты не загрузились
+            # 🔴 Фолбэк: красный квадрат, если спрайт не найден
+            # Поможет сразу увидеть проблему при отладке
             pygame.draw.rect(screen, (255, 0, 0), (screen_x, screen_y, 32, 32))
+            # Для продакшена можно заменить на заглушку:
+            # if self.sprites and 'down' in self.sprites and self.sprites['down']:
+            #     screen.blit(self.sprites['down'][0], (screen_x, screen_y))
 
 class NPC:
     def __init__(self, name: str, anim: list, dialog_data: dict, camera):
