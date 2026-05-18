@@ -504,8 +504,8 @@ class Tips:
         if near and self.castle_trigger_rect:
             self.update_animation()
             # Центрируем кнопку E над триггером
-            screen_x = self.castle_trigger_rect.centerx
-            screen_y = self.castle_trigger_rect.top - 40
+            screen_x = self.castle_trigger_rect.centerx - 10
+            screen_y = self.castle_trigger_rect.top - 140
             img = self.image_E_1 if self.current_frame == 0 else self.image_E_2
             screen.blit(img, (screen_x, screen_y))
             print(1)
