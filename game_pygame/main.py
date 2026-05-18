@@ -519,10 +519,10 @@ class Grid:
         # 🏰 Зона взаимодействия с замком (невидимый квадрат 100x100)
         castle_rect = self.house[0]['rect']  # первое здание — замок
         self.castle_trigger = pygame.Rect(
-            castle_rect.centerx - 200,  # центр - половина размера = квадрат 100x100
-            castle_rect.centery - 50,
-            300,
-            370
+            castle_rect.centerx,
+            castle_rect.centery,
+            150,
+            100
         )
         self.near_castle_flag = False
 
@@ -551,13 +551,9 @@ class Grid:
         player_point = pygame.Rect(player_world_x, player_world_y, 1, 1)
 
         castle_rect = self.house[0]['rect']
-        self.castle_trigger = pygame.Rect(
-            castle_rect.centerx - 200 + camera_coord[0],  # центр - половина размера = квадрат 100x100
-            castle_rect.centery - 50 + camera_coord[1],
-            300,
-            370
-        )
-        pygame.draw.rect(screen, (0, 255, 0), self.castle_trigger, 2)
+        self.castle_trigger.x = castle_rect.centerx - 150 + camera_coord[0]
+        self.castle_trigger.y = castle_rect.centery + 250 + camera_coord[1]
+        #pygame.draw.rect(screen, (0, 255, 0), self.castle_trigger, 2)
 
         if player_point.colliderect(self.castle_trigger):
             self.near_castle_flag = True
@@ -568,12 +564,7 @@ class Grid:
     def get_castle_trigger_screen(self):
         """Возвращает экранные координаты триггера для отрисовки подсказки"""
         camera_coord = self.camera.step()
-        return pygame.Rect(
-            self.castle_trigger.x + camera_coord[0],
-            self.castle_trigger.y + camera_coord[1],
-            self.castle_trigger.width,
-            self.castle_trigger.height
-        )
+        return self.castle_trigger
 
 class Game:
     def __init__(self):
