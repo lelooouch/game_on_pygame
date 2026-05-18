@@ -12,45 +12,75 @@ screen_height = screen_info.current_h
 
 # Создаем полноэкранное окно
 screen = pygame.display.set_mode((screen_width, screen_height), pygame.FULLSCREEN)
+
+WORLD_WIDTH = screen_width + 2000
+WORLD_HEIGHT = screen_height + 2000
 pygame.display.set_caption("Game")
 
 clock = pygame.time.Clock()
 
 
+class Location:
+    """Хранит все данные одной локации: фон, здания, границы камеры, спавн игрока"""
+
+    def __init__(self, name, background_path, house_data, camera_bounds, player_spawn):
+        self.name = name
+        self.background_path = background_path
+        self.house_data = house_data  # список словарей {'rect': ..., 'image': ...}
+        self.camera_bounds = camera_bounds  # (min_x, max_x, min_y, max_y)
+        self.player_spawn = player_spawn  # (x, y) мировые координаты
+
+        # Загружаем фон один раз при создании
+        self.background = pygame.image.load(background_path)
+        self.background = pygame.transform.scale(self.background, (WORLD_WIDTH, WORLD_HEIGHT))
+
+        # Создаём rect'ы для зданий
+        self.house = []
+        for data in house_data:
+            self.house.append({
+                'rect': data['rect'].copy(),  # копируем, чтобы не менять оригинал
+                'image': data['image']
+            })
+
 class Camera:
     def __init__(self, camera_x, camera_y, screen_width, screen_height):
         self.camera_x = camera_x
         self.camera_y = camera_y
-
         self.screen_width = screen_width
         self.screen_height = screen_height
-
         self.step_cord = 2
+
+        # 🆕 Границы движения камеры (по умолчанию — широкие)
+        self.min_x = -3000
+        self.max_x = 3000
+        self.min_y = -3000
+        self.max_y = 3000
+
+    def set_bounds(self, min_x, max_x, min_y, max_y):
+        """Устанавливает новые границы для камеры"""
+        self.min_x = min_x
+        self.max_x = max_x
+        self.min_y = min_y
+        self.max_y = max_y
 
     def step(self):
         mouse_pos = pygame.mouse.get_pos()
         keys = pygame.key.get_pressed()
 
         # камера вправо
-        if (mouse_pos[0] >= self.screen_width - 2 or keys[
-            pygame.K_RIGHT]) and self.camera_x >= self.screen_width - 2250:
+        if (mouse_pos[0] >= self.screen_width - 2 or keys[pygame.K_RIGHT]) and self.camera_x >= self.min_x:
             self.camera_x -= self.step_cord
-
-        # камера вниз
-        if (mouse_pos[1] >= self.screen_height - 2 or keys[
-            pygame.K_DOWN]) and self.camera_y >= self.screen_height - 1330:
-            self.camera_y -= self.step_cord
-
         # камера влево
-        if (mouse_pos[0] <= 2 or keys[pygame.K_LEFT]) and self.camera_x <= self.screen_width - 1650:
+        if (mouse_pos[0] <= 2 or keys[pygame.K_LEFT]) and self.camera_x <= self.max_x:
             self.camera_x += self.step_cord
-
+        # камера вниз
+        if (mouse_pos[1] >= self.screen_height - 2 or keys[pygame.K_DOWN]) and self.camera_y >= self.min_y:
+            self.camera_y -= self.step_cord
         # камера вверх
-        if (mouse_pos[1] <= 2 or keys[pygame.K_UP]) and self.camera_y <= self.screen_height - 950:
+        if (mouse_pos[1] <= 2 or keys[pygame.K_UP]) and self.camera_y <= self.max_y:
             self.camera_y += self.step_cord
 
         return [self.camera_x, self.camera_y]
-
 
 class Player:
     def __init__(self, x, y, camera):
@@ -471,136 +501,110 @@ class Tips:
 
 
 class Grid:
-    def __init__(self, camera, screen_width=screen_width, screen_height=screen_height):
-        self.house = []
-
-        # установка фона
-        self.background = pygame.image.load("pic/bg_2.jpg")
-        self.background = pygame.transform.scale(self.background, (screen_width + 2000, screen_height + 2000))
-
-        image1 = pygame.image.load("pic/house/castle.png")
-        rect = image1.get_rect()
-        rect.topleft = (750, 100)
-
-        self.house.append(
-            {
-                'rect': rect,
-                'image': image1
-            }
-        )
-
-        image2 = pygame.image.load("pic/house/house_start.png")
-        rect = image2.get_rect()
-        rect.topleft = (1250, 330)
-
-        self.house.append(
-            {
-                'rect': rect,
-                'image': image2
-            }
-        )
-
-        rect = pygame.Rect(0, 0, screen_width + 1000, 150)
-        self.house.append(
-            {
-                'rect': rect,
-                'image': None
-            }
-        )
-
-        rect = pygame.Rect(0, screen_height + 400, screen_width + 1000, 150)
-        self.house.append(
-            {
-                'rect': rect,
-                'image': None
-            }
-        )
-
-        rect = pygame.Rect(0, 0, 240, screen_height + 1000)
-        self.house.append(
-            {
-                'rect': rect,
-                'image': None
-            }
-        )
-
-        rect = pygame.Rect(1865, 316, 130, 213) # правые руины
-        self.house.append(
-            {
-                'rect': rect,
-                'image': None
-            }
-        )
-
-        rect = pygame.Rect(1615, 460, 178, 60)
-        self.house.append(
-            {
-                'rect': rect,
-                'image': None
-            }
-        )
-
-        rect = pygame.Rect(720, 805, 220, 165)
-        self.house.append(
-            {
-                'rect': rect,
-                'image': None
-            }
-        )
-
-        rect = pygame.Rect(2020, 930, 90, 103)
-        self.house.append(
-            {
-                'rect': rect,
-                'image': None
-            }
-        )
-
-        rect = pygame.Rect(1100, 430, 90, 90) #npc
-        self.house.append(
-            {
-                'rect': rect,
-                'image': None
-            }
-        )
-
-        self.screen_width = screen_width
-        self.screen_height = screen_height
-
+    def __init__(self, camera, location: Location):
         self.camera = camera
+        self.location = location
+        self.house = location.house  # ссылка на здания из локации
 
     def draw(self):
         camera_coord = self.camera.step()
-        screen.blit(self.background, (camera_coord[0], camera_coord[1]))
+        screen.blit(self.location.background, (camera_coord[0], camera_coord[1]))
 
         for build in self.house:
-            # Создаем временный rect для отрисовки, НЕ меняем оригинал
-            self.draw_rect = pygame.Rect(
+            draw_rect = pygame.Rect(
                 build['rect'].x + camera_coord[0],
                 build['rect'].y + camera_coord[1],
                 build['rect'].width,
                 build['rect'].height
             )
-
             if build['image']:
-                screen.blit(build['image'], self.draw_rect)
+                screen.blit(build['image'], draw_rect)
+            # pygame.draw.rect(screen, (255, 255, 255), draw_rect, 2)  # отладка хитбоксов
 
-            # pygame.draw.rect(screen, (255, 255, 255), self.draw_rect, 2) # показать хитбоксы
+    def update_camera_bounds(self):
+        """Передаёт границы камеры из текущей локации"""
+        min_x, max_x, min_y, max_y = self.location.camera_bounds
+        self.camera.set_bounds(min_x, max_x, min_y, max_y)
 
 
 class Game:
     def __init__(self):
+        # 📦 Данные первой локации
+        location1_house = [
+            {'rect': pygame.Rect(750, 100, 400, 400), 'image': pygame.image.load("pic/house/castle.png")},
+            {'rect': pygame.Rect(1250, 330, 300, 200), 'image': pygame.image.load("pic/house/house_start.png")},
+            # ... остальные здания из вашего Grid ...
+            {'rect': pygame.Rect(0, 0, screen_width + 1000, 150), 'image': None},
+            {'rect': pygame.Rect(0, screen_height + 400, screen_width + 1000, 150), 'image': None},
+            {'rect': pygame.Rect(0, 0, 240, screen_height + 1000), 'image': None},
+            {'rect': pygame.Rect(1865, 316, 130, 213), 'image': None},
+            {'rect': pygame.Rect(1615, 460, 178, 60), 'image': None},
+            {'rect': pygame.Rect(720, 805, 220, 165), 'image': None},
+            {'rect': pygame.Rect(2020, 930, 90, 103), 'image': None},
+            {'rect': pygame.Rect(1100, 430, 90, 90), 'image': None},  # зона NPC
+        ]
+
+        self.location1 = Location(
+            name="village",
+            background_path="pic/bg_2.jpg",
+            house_data=location1_house,
+            camera_bounds=(-710, -5, -420, -5),  # подгоните под вашу карту
+            player_spawn=(2050, 600)
+        )
+
+        # 🏰 Данные второй локации (замок)
+        location2_house = [
+            # Пример: только замок и новые препятствия
+            {'rect': pygame.Rect(500, 200, 800, 600), 'image': pygame.image.load("pic/bg_21.jpg")},
+            {'rect': pygame.Rect(0, 0, screen_width + 2000, 100), 'image': None},  # верхняя граница
+            {'rect': pygame.Rect(0, 1500, screen_width + 2000, 100), 'image': None},  # нижняя граница
+            # ... добавьте другие здания второй локации ...
+        ]
+
+        self.location2 = Location(
+            name="castle",
+            background_path="pic/bg_21.jpg",  # новый фон
+            house_data=location2_house,
+            camera_bounds=(-900, 1000, -1000, 500),  # границы для замка
+            player_spawn=(800, 400)  # где появится игрок в замке
+        )
+
         self.camera = Camera(-700, -200, screen_width, screen_height)
-        self.grid = Grid(self.camera)
+        self.current_location = self.location1
+        self.grid = Grid(self.camera, self.current_location)
+        self.grid.update_camera_bounds()  # применяем границы
+
         self.running = True
-        self.player = Player(2050, 600, self.camera)
+        self.player = Player(self.current_location.player_spawn[0],
+                             self.current_location.player_spawn[1],
+                             self.camera)
         self.last_time = pygame.time.get_ticks()
 
+        # NPC только для первой локации
         self.npc = NPC("Торговец", npc_frames, first_npc, self.camera)
         self.npc.set_position(1100, 430)
-
         self.tips = Tips(self.camera, self.npc)
-        # ... остальной код init ...
+
+        # 🚪 Триггер перехода у замка (невидимый прямоугольник)
+        self.castle_trigger = pygame.Rect(900, 350, 100, 80)  # подгоните под вход в замок
+
+
+
+
+    def _switch_location(self, new_location: Location):
+        """Переключает локацию и переносит игрока"""
+        self.current_location = new_location
+        self.grid = Grid(self.camera, self.current_location)
+        self.grid.update_camera_bounds()
+
+        # Телепортируем игрока в точку спавна новой локации
+        self.player.world_x, self.player.world_y = new_location.player_spawn
+        self.player.moving = False
+
+        # 🎭 Опционально: эффект перехода (затемнение, звук)
+        # pygame.mixer.Sound("sounds/transition.wav").play()
+
+        print(f"🔄 Переход в локацию: {new_location.name}")
 
     def run(self):
         while self.running:
@@ -619,23 +623,37 @@ class Game:
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     self.running = False
 
-            # 🆕 Обновляем логику диалога КАЖДЫЙ кадр
-            self.npc.update_dialog(events)
+            # 🔄 Проверка триггера перехода (только если не в диалоге)
+            if self.current_location == self.location1 and not self.npc.is_interactive:
+                player_rect = pygame.Rect(self.player.world_x, self.player.world_y,
+                                          self.player.rect.width, self.player.rect.height)
+                if player_rect.colliderect(self.castle_trigger):
+                    self._switch_location(self.location2)
 
-            if not self.npc.is_interactive:
+            # 🗣️ Обновляем диалог (только если есть активный NPC)
+            if self.current_location == self.location1:
+                self.npc.update_dialog(events)
+
+            if self.current_location == self.location1 and self.npc.is_interactive:
+                # 🎭 Диалоговый режим
+                self.npc.draw_dialog(screen)
+            else:
+                # 🎮 Обычный геймплей
                 self.grid.draw()
-                self.npc.update_animation(dt)
-                self.npc.anim_draw(screen)
+
+                # NPC рисуем и обновляем только в первой локации
+                if self.current_location == self.location1:
+                    self.npc.update_animation(dt)
+                    self.npc.anim_draw(screen)
+
+                    player_screen_x = self.player.world_x + self.camera.step()[0]
+                    player_screen_y = self.player.world_y + self.camera.step()[1]
+                    near_npc = self.npc.near(player_screen_x, player_screen_y)
+                    self.npc.interaction()
+                    self.tips.draw_E(screen, near_npc)
+
                 self.player.move(self.grid.house, dt)
                 self.player.draw(screen)
-
-                player_screen_x = self.player.world_x + self.camera.step()[0]
-                player_screen_y = self.player.world_y + self.camera.step()[1]
-                near_npc = self.npc.near(player_screen_x, player_screen_y)
-                self.npc.interaction()
-                self.tips.draw_E(screen, near_npc)
-            else:
-                self.npc.draw_dialog(screen)
 
             pygame.display.flip()
             clock.tick(60)
