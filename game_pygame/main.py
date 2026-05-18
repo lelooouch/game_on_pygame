@@ -463,9 +463,8 @@ class NPC:
         self.near_player = False
         return False
 
-
 class Tips:
-    def __init__(self, camera, npc):
+    def __init__(self, camera, npc=None, castle_trigger_rect=None):
         self.camera = camera
         # Загружаем два кадра для анимации
         self.image_E_1 = pygame.image.load('pic/button/button_E_1.png')
@@ -477,6 +476,7 @@ class Tips:
         self.animation_timer = 0
         self.animation_speed = 0.3  # скорость анимации
         self.npc = npc
+        self.castle_trigger_rect = castle_trigger_rect  # 🆕 зона замка
 
     def update_animation(self):
         """Обновляет анимацию кнопки"""
@@ -499,12 +499,32 @@ class Tips:
             else:
                 screen.blit(self.image_E_2, (screen_x, screen_y))
 
+    def draw_E_castle(self, screen, near):
+        """🆕 Отрисовка подсказки у замка"""
+        if near and self.castle_trigger_rect:
+            self.update_animation()
+            # Центрируем кнопку E над триггером
+            screen_x = self.castle_trigger_rect.centerx
+            screen_y = self.castle_trigger_rect.top - 40
+            img = self.image_E_1 if self.current_frame == 0 else self.image_E_2
+            screen.blit(img, (screen_x, screen_y))
+            print(1)
 
 class Grid:
     def __init__(self, camera, location: Location):
         self.camera = camera
         self.location = location
         self.house = location.house  # ссылка на здания из локации
+
+        # 🏰 Зона взаимодействия с замком (невидимый квадрат 100x100)
+        castle_rect = self.house[0]['rect']  # первое здание — замок
+        self.castle_trigger = pygame.Rect(
+            castle_rect.centerx - 200,  # центр - половина размера = квадрат 100x100
+            castle_rect.centery - 50,
+            300,
+            370
+        )
+        self.near_castle_flag = False
 
     def draw(self):
         camera_coord = self.camera.step()
@@ -526,6 +546,34 @@ class Grid:
         min_x, max_x, min_y, max_y = self.location.camera_bounds
         self.camera.set_bounds(min_x, max_x, min_y, max_y)
 
+    def near_castle(self, player_world_x, player_world_y):
+        camera_coord = self.camera.step()
+        player_point = pygame.Rect(player_world_x, player_world_y, 1, 1)
+
+        castle_rect = self.house[0]['rect']
+        self.castle_trigger = pygame.Rect(
+            castle_rect.centerx - 200 + camera_coord[0],  # центр - половина размера = квадрат 100x100
+            castle_rect.centery - 50 + camera_coord[1],
+            300,
+            370
+        )
+        pygame.draw.rect(screen, (0, 255, 0), self.castle_trigger, 2)
+
+        if player_point.colliderect(self.castle_trigger):
+            self.near_castle_flag = True
+            return True
+        self.near_castle_flag = False
+        return False
+
+    def get_castle_trigger_screen(self):
+        """Возвращает экранные координаты триггера для отрисовки подсказки"""
+        camera_coord = self.camera.step()
+        return pygame.Rect(
+            self.castle_trigger.x + camera_coord[0],
+            self.castle_trigger.y + camera_coord[1],
+            self.castle_trigger.width,
+            self.castle_trigger.height
+        )
 
 class Game:
     def __init__(self):
@@ -583,13 +631,10 @@ class Game:
         # NPC только для первой локации
         self.npc = NPC("Торговец", npc_frames, first_npc, self.camera)
         self.npc.set_position(1100, 430)
-        self.tips = Tips(self.camera, self.npc)
+        self.tips = Tips(self.camera, self.npc, self.grid.get_castle_trigger_screen())
 
         # 🚪 Триггер перехода у замка (невидимый прямоугольник)
         self.castle_trigger = pygame.Rect(900, 350, 100, 80)  # подгоните под вход в замок
-
-
-
 
     def _switch_location(self, new_location: Location):
         """Переключает локацию и переносит игрока"""
@@ -622,13 +667,10 @@ class Game:
                     self.running = False
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     self.running = False
-
-            # 🔄 Проверка триггера перехода (только если не в диалоге)
-            if self.current_location == self.location1 and not self.npc.is_interactive:
-                player_rect = pygame.Rect(self.player.world_x, self.player.world_y,
-                                          self.player.rect.width, self.player.rect.height)
-                if player_rect.colliderect(self.castle_trigger):
-                    self._switch_location(self.location2)
+                    # 🆕 Открытие замка по E
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_e:
+                    if self.current_location == self.location1 and self.grid.near_castle_flag:
+                        self._switch_location(self.location2)
 
             # 🗣️ Обновляем диалог (только если есть активный NPC)
             if self.current_location == self.location1:
@@ -638,19 +680,23 @@ class Game:
                 # 🎭 Диалоговый режим
                 self.npc.draw_dialog(screen)
             else:
-                # 🎮 Обычный геймплей
                 self.grid.draw()
 
-                # NPC рисуем и обновляем только в первой локации
+                # Логика для первой локации
                 if self.current_location == self.location1:
                     self.npc.update_animation(dt)
                     self.npc.anim_draw(screen)
 
+                    # Проверка близости к NPC
                     player_screen_x = self.player.world_x + self.camera.step()[0]
                     player_screen_y = self.player.world_y + self.camera.step()[1]
                     near_npc = self.npc.near(player_screen_x, player_screen_y)
                     self.npc.interaction()
                     self.tips.draw_E(screen, near_npc)
+
+                    # 🆕 Проверка близости к замку (мировые координаты!)
+                    near_castle = self.grid.near_castle(player_screen_x, player_screen_y)
+                    self.tips.draw_E_castle(screen, near_castle)
 
                 self.player.move(self.grid.house, dt)
                 self.player.draw(screen)
