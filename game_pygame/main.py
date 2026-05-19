@@ -508,7 +508,6 @@ class Tips:
             screen_y = self.castle_trigger_rect.top - 140
             img = self.image_E_1 if self.current_frame == 0 else self.image_E_2
             screen.blit(img, (screen_x, screen_y))
-            print(1)
 
 class Grid:
     def __init__(self, camera, location: Location):
@@ -522,7 +521,7 @@ class Grid:
             castle_rect.centerx,
             castle_rect.centery,
             150,
-            100
+            70
         )
         self.near_castle_flag = False
 
@@ -552,7 +551,7 @@ class Grid:
 
         castle_rect = self.house[0]['rect']
         self.castle_trigger.x = castle_rect.centerx - 150 + camera_coord[0]
-        self.castle_trigger.y = castle_rect.centery + 250 + camera_coord[1]
+        self.castle_trigger.y = castle_rect.centery + 220 + camera_coord[1]
         #pygame.draw.rect(screen, (0, 255, 0), self.castle_trigger, 2)
 
         if player_point.colliderect(self.castle_trigger):
@@ -613,6 +612,10 @@ class Game:
         self.grid = Grid(self.camera, self.current_location)
         self.grid.update_camera_bounds()  # применяем границы
 
+        pygame.mixer.music.load('music/INEKT_-_KYRR_first.mp3')
+        pygame.mixer.music.set_volume(0.3)  # громкость от 0.0 до 1.0
+        pygame.mixer.music.play(-1)
+
         self.running = True
         self.player = Player(self.current_location.player_spawn[0],
                              self.current_location.player_spawn[1],
@@ -672,7 +675,6 @@ class Game:
                 self.npc.draw_dialog(screen)
             else:
                 self.grid.draw()
-
                 # Логика для первой локации
                 if self.current_location == self.location1:
                     self.npc.update_animation(dt)
