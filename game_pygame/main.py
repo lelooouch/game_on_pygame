@@ -15,7 +15,7 @@ screen = pygame.display.set_mode((screen_width, screen_height), pygame.FULLSCREE
 
 WORLD_WIDTH = screen_width + 2000
 WORLD_HEIGHT = screen_height + 2000
-pygame.display.set_caption("Game")
+pygame.display.set_caption("Shadow of the Blight")
 
 clock = pygame.time.Clock()
 
@@ -91,6 +91,10 @@ class Player:
         self.moving = False
 
         self.camera = camera
+
+        self.hp = 1000
+        self.attack = 50
+
 
         # 🎭 Загрузка спрайтов для 4 направлений
         # Формат: "anim/player/{direction}/{frame}.png"
@@ -183,7 +187,6 @@ class Player:
             self._update_animation(dt, is_moving=False)
             return
 
-        # === Логика движения (ваша, без изменений) ===
         clicked_on_building = False
         for build in buildings:
             hitbox = build['rect'].inflate(-60, -60)
@@ -227,7 +230,7 @@ class Player:
         step_x = (dx / distance) * self.speed
         step_y = (dy / distance) * self.speed
 
-        # 🎯 Определяем направление ДО перемещения
+
         self.direction = self._get_direction(dx, dy)
 
         new_x = self.world_x + step_x
@@ -244,7 +247,6 @@ class Player:
         self.world_x = new_x
         self.world_y = new_y
 
-        # 🎬 Обновляем анимацию только если движемся
         self._update_animation(dt, is_moving=True)
 
     def set_target(self, x, y):
