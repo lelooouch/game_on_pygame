@@ -95,7 +95,6 @@ class Player:
         self.hp = 1000
         self.attack = 50
 
-
         # 🎭 Загрузка спрайтов для 4 направлений
         # Формат: "anim/player/{direction}/{frame}.png"
         # direction: 'up', 'down', 'left', 'right'
@@ -540,7 +539,7 @@ class Grid:
             )
             if build['image']:
                 screen.blit(build['image'], draw_rect)
-            # pygame.draw.rect(screen, (255, 255, 255), draw_rect, 2)  # отладка хитбоксов
+            pygame.draw.rect(screen, (255, 255, 255), draw_rect, 2)  # отладка хитбоксов
 
     def update_camera_bounds(self):
         """Передаёт границы камеры из текущей локации"""
@@ -572,8 +571,8 @@ class Game:
         # 📦 Данные первой локации
         location1_house = [
             {'rect': pygame.Rect(750, 100, 400, 400), 'image': pygame.image.load("pic/house/castle.png")},
-            {'rect': pygame.Rect(1250, 330, 300, 200), 'image': pygame.image.load("pic/house/house_start.png")},
-            # ... остальные здания из вашего Grid ...
+            {'rect': pygame.Rect(1250, 330, 200, 200), 'image': pygame.image.load("pic/house/house_start.png")},
+
             {'rect': pygame.Rect(0, 0, screen_width + 1000, 150), 'image': None},
             {'rect': pygame.Rect(0, screen_height + 400, screen_width + 1000, 150), 'image': None},
             {'rect': pygame.Rect(0, 0, 240, screen_height + 1000), 'image': None},
@@ -588,24 +587,25 @@ class Game:
             name="village",
             background_path="pic/bg_2.jpg",
             house_data=location1_house,
-            camera_bounds=(-710, -5, -420, -5),  # подгоните под вашу карту
+            camera_bounds=(-710, -5, -420, -5),  # подгоните под карту
             player_spawn=(2050, 600)
         )
 
         # 🏰 Данные второй локации (замок)
         location2_house = [
             # Пример: только замок и новые препятствия
-            {'rect': pygame.Rect(500, 200, 800, 600), 'image': pygame.image.load("pic/bg_21.jpg")},
-            {'rect': pygame.Rect(0, 0, screen_width + 2000, 100), 'image': None},  # верхняя граница
-            {'rect': pygame.Rect(0, 1500, screen_width + 2000, 100), 'image': None},  # нижняя граница
-            # ... добавьте другие здания второй локации ...
+            {'rect': pygame.Rect(500, 400, 100, 160), 'image': pygame.image.load("pic/house/statue.png")},
+            {'rect': pygame.Rect(0, 0, screen_width + 2000, 170), 'image': None},  # верхняя граница
+            {'rect': pygame.Rect(0, screen_height + 300, screen_width + 1000, 150), 'image': None}, # нижняя граница
+            {'rect': pygame.Rect(0, 0, 240, screen_height + 1000), 'image': None}, # левая
+            {'rect': pygame.Rect(screen_width + 530, 0, 240, screen_height + 1000), 'image': None}, # правая
         ]
 
         self.location2 = Location(
             name="castle",
             background_path="pic/bg_21.jpg",  # новый фон
             house_data=location2_house,
-            camera_bounds=(-900, 1000, -1000, 500),  # границы для замка
+            camera_bounds=(-710, -5, -420, -5),
             player_spawn=(800, 400)  # где появится игрок в замке
         )
 
