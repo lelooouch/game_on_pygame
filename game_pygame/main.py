@@ -1,5 +1,7 @@
 import pygame
 import sys
+import random
+import math
 
 from base import *
 
@@ -91,9 +93,7 @@ class Player:
         self.moving = False
 
         self.camera = camera
-
-        self.hp = 1000
-        self.attack = 50
+        self.hp_bar = hp_bar
 
         # 🎭 Загрузка спрайтов для 4 направлений
         # Формат: "anim/player/{direction}/{frame}.png"
@@ -138,6 +138,12 @@ class Player:
                 break
 
         self.click_effects = []
+
+    def health(self, hp):
+        img = pygame.image.load(hp_bar[hp])
+        img = pygame.transform.scale(img, (int(img.get_width() * 0.75), int(img.get_height() * 0.75)))
+        screen.blit(img, (1340, 40))
+
 
     def add_click_effect(self, x, y):
         self.click_effects.append({
@@ -280,6 +286,65 @@ class Player:
             # Для продакшена можно заменить на заглушку:
             # if self.sprites and 'down' in self.sprites and self.sprites['down']:
             #     screen.blit(self.sprites['down'][0], (screen_x, screen_y))
+
+class Enemy:
+    def __init__(self, camera, enemy_base):
+        self.camera = camera
+        self.enemy_base = enemy_base
+
+        self.x = 0
+        self.y = 0
+
+        # 🎭 Загружаем кадры анимации
+        self.anim = []
+        frame_id = 1
+        while True:
+            try:
+                frame = pygame.image.load(f"pic/enemy/{self.enemy_base['type']}/{frame_id}.png")
+                # new_w = int(frame.get_width() * 0.75)
+                # new_h = int(frame.get_height() * 0.75)
+                # frame = pygame.transform.scale(frame, (new_w, new_h))
+                self.anim.append(frame)
+                frame_id += 1
+            except FileNotFoundError:
+                break
+
+        # ⚙️ Состояние анимации
+        self.current_frame = 0
+        self.animation_timer = 0
+        self.animation_speed = 0.15  # секунд на кадр
+
+        self.step = 5
+
+    def random_location(self, min_x, max_x, min_y, max_y):
+        self.x = random.randint(min_x, max_x)
+        self.y = random.randint(min_y, max_y)
+
+    def update_animation(self, dt):
+        """Обновляет кадр анимации. Вызывать каждый кадр."""
+        if not self.anim:
+            return
+        self.animation_timer += dt
+        if self.animation_timer >= self.animation_speed:
+            self.animation_timer = 0
+            self.current_frame = (self.current_frame + 1) % len(self.anim)
+
+    def draw(self, screen):
+        if not self.anim:
+            return
+        camera_coord = self.camera.step()
+        screen_x = self.x + camera_coord[0]
+        screen_y = self.y + camera_coord[1]
+        screen.blit(self.anim[self.current_frame], (screen_x, screen_y))
+
+    def random_location(self, min_x, max_x, min_y, max_y):
+        self.x = random.randint(min_x, max_x)
+        self.y = random.randint(min_y, max_y)
+
+    def move(self):
+        self.x += math.sin(0.1 * self.step) * 5
+        self.step += 1
+
 
 class NPC:
     def __init__(self, name: str, anim: list, dialog_data: dict, camera):
@@ -570,7 +635,7 @@ class Game:
     def __init__(self):
         # 📦 Данные первой локации
         location1_house = [
-            {'rect': pygame.Rect(750, 100, 400, 400), 'image': pygame.image.load("pic/house/castle.png")},
+            {'rect': pygame.Rect(750, 100, 300, 400), 'image': pygame.image.load("pic/house/castle.png")},
             {'rect': pygame.Rect(1250, 330, 200, 200), 'image': pygame.image.load("pic/house/house_start.png")},
 
             {'rect': pygame.Rect(0, 0, screen_width + 1000, 150), 'image': None},
@@ -624,10 +689,20 @@ class Game:
                              self.camera)
         self.last_time = pygame.time.get_ticks()
 
+
         # NPC только для первой локации
         self.npc = NPC("Торговец", npc_frames, first_npc, self.camera)
         self.npc.set_position(1100, 430)
         self.tips = Tips(self.camera, self.npc, self.grid.get_castle_trigger_screen())
+
+        # 👇 НОВЫЙ КОД: создаём врага и один раз задаём ему случайную позицию
+        self.enemy = Enemy(self.camera, enemy_1)
+
+        # Границы для спавна — подставь свои (мировые координаты, где враг может появиться)
+        self.enemy.random_location(
+            min_x=300, max_x=screen_width + 430,
+            min_y=200, max_y=screen_height + 200
+        )
 
         # 🚪 Триггер перехода у замка (невидимый прямоугольник)
         self.castle_trigger = pygame.Rect(900, 350, 100, 80)  # подгоните под вход в замок
@@ -641,9 +716,6 @@ class Game:
         # Телепортируем игрока в точку спавна новой локации
         self.player.world_x, self.player.world_y = new_location.player_spawn
         self.player.moving = False
-
-        # 🎭 Опционально: эффект перехода (затемнение, звук)
-        # pygame.mixer.Sound("sounds/transition.wav").play()
 
         print(f"🔄 Переход в локацию: {new_location.name}")
 
@@ -693,9 +765,14 @@ class Game:
                     near_castle = self.grid.near_castle(player_screen_x, player_screen_y)
                     self.tips.draw_E_castle(screen, near_castle)
 
+                elif self.current_location == self.location2:
+                    self.enemy.update_animation(dt)
+                    self.enemy.move()
+                    self.enemy.draw(screen)
+
                 self.player.move(self.grid.house, dt)
                 self.player.draw(screen)
-
+                self.player.health(100)
             pygame.display.flip()
             clock.tick(60)
 
