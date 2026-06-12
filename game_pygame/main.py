@@ -316,6 +316,32 @@ class Enemy:
 
         self.step = 5
 
+        self.detection_radius = 300  # радиус обнаружения игрока
+        self.speed = 2  # скорость движения к игроку
+        self.is_chasing = False  # флаг: преследует ли враг игрока
+
+    def chase_player(self, player):
+        """Преследует игрока, если он в зоне видимости"""
+        # Вычисляем расстояние между врагом и игроком
+        dx = player.world_x - self.x
+        dy = player.world_y - self.y
+        distance = math.sqrt(dx ** 2 + dy ** 2)
+
+        # Проверяем, находится ли игрок в зоне обнаружения
+        if distance < self.detection_radius:
+            self.is_chasing = True
+
+            # Если расстояние больше 0, двигаемся к игроку
+            if distance > 0:
+                # Нормализуем вектор и умножаем на скорость
+                step_x = (dx / distance) * self.speed
+                step_y = (dy / distance) * self.speed
+
+                self.x += step_x
+                self.y += step_y
+        else:
+            self.is_chasing = False
+
     def random_location(self, min_x, max_x, min_y, max_y):
         self.x = random.randint(min_x, max_x)
         self.y = random.randint(min_y, max_y)
@@ -695,11 +721,18 @@ class Game:
         self.npc.set_position(1100, 430)
         self.tips = Tips(self.camera, self.npc, self.grid.get_castle_trigger_screen())
 
-        # 👇 НОВЫЙ КОД: создаём врага и один раз задаём ему случайную позицию
-        self.enemy = Enemy(self.camera, enemy_1)
+        # 👇создаём врага и один раз задаём ему случайную позицию
+        self.enemy_1 = Enemy(self.camera, enemy_1)
+        self.enemy_2 = Enemy(self.camera, enemy_1)
 
-        # Границы для спавна — подставь свои (мировые координаты, где враг может появиться)
-        self.enemy.random_location(
+
+        # Границы для спавна
+        self.enemy_1.random_location(
+            min_x=300, max_x=screen_width + 430,
+            min_y=200, max_y=screen_height + 200
+        )
+
+        self.enemy_2.random_location(
             min_x=300, max_x=screen_width + 430,
             min_y=200, max_y=screen_height + 200
         )
@@ -766,9 +799,20 @@ class Game:
                     self.tips.draw_E_castle(screen, near_castle)
 
                 elif self.current_location == self.location2:
-                    self.enemy.update_animation(dt)
-                    self.enemy.move()
-                    self.enemy.draw(screen)
+                    self.enemy_1.update_animation(dt)
+                    self.enemy_1.chase_player(self.player)
+
+                    self.enemy_2.update_animation(dt)
+                    self.enemy_2.chase_player(self.player)
+
+                    # Если не преследует — используем старое поведение (синусоида)
+                    if not self.enemy_1.is_chasing:
+                        self.enemy_1.move()
+                    if not self.enemy_2.is_chasing:
+                        self.enemy_2.move()
+
+                    self.enemy_1.draw(screen)
+                    self.enemy_2.draw(screen)
 
                 self.player.move(self.grid.house, dt)
                 self.player.draw(screen)
