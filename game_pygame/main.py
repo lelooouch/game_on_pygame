@@ -92,6 +92,7 @@ class Player:
         self.speed = 3
         self.moving = False
 
+        self.hp = 100
         self.camera = camera
         self.hp_bar = hp_bar
 
@@ -140,7 +141,7 @@ class Player:
         self.click_effects = []
 
     def health(self, hp):
-        img = pygame.image.load(hp_bar[hp])
+        img = pygame.image.load(hp_bar[self.hp])
         img = pygame.transform.scale(img, (int(img.get_width() * 0.75), int(img.get_height() * 0.75)))
         screen.blit(img, (1340, 40))
 
@@ -339,6 +340,9 @@ class Enemy:
 
                 self.x += step_x
                 self.y += step_y
+                print(distance)
+                if distance <= 10:
+                    player.hp -= 20
         else:
             self.is_chasing = False
 
@@ -370,7 +374,6 @@ class Enemy:
     def move(self):
         self.x += math.sin(0.1 * self.step) * 5
         self.step += 1
-
 
 class NPC:
     def __init__(self, name: str, anim: list, dialog_data: dict, camera):
@@ -596,7 +599,7 @@ class Tips:
         if near and self.castle_trigger_rect:
             self.update_animation()
             # Центрируем кнопку E над триггером
-            screen_x = self.castle_trigger_rect.centerx - 10
+            screen_x = self.castle_trigger_rect.centerx + 40
             screen_y = self.castle_trigger_rect.top - 140
             img = self.image_E_1 if self.current_frame == 0 else self.image_E_2
             screen.blit(img, (screen_x, screen_y))
