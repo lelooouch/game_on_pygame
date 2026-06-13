@@ -140,11 +140,31 @@ class Player:
 
         self.click_effects = []
 
-    def health(self, hp):
+        self.last_damage_time = 0  # время последнего полученного урона
+        self.damage_cooldown = 1000  # кулдаун в миллисекундах (1000 = 1 секунда)
+        self.is_invulnerable = False  # флаг неуязвимости (для эффекта мигания)
+
+    def take_damage(self, amount):
+        """Получить урон с учётом кулдауна. Возвращает True, если урон применён."""
+        now = pygame.time.get_ticks()
+        if now - self.last_damage_time < self.damage_cooldown:
+            return False  # ещё неуязвим
+
+        self.hp -= amount
+        self.last_damage_time = now
+        self.is_invulnerable = True
+        return True
+
+    def update_invulnerability(self):
+        """Обновляет состояние неуязвимости (вызывать каждый кадр)"""
+        now = pygame.time.get_ticks()
+        if self.is_invulnerable and now - self.last_damage_time >= self.damage_cooldown:
+            self.is_invulnerable = False
+
+    def health(self):
         img = pygame.image.load(hp_bar[self.hp])
         img = pygame.transform.scale(img, (int(img.get_width() * 0.75), int(img.get_height() * 0.75)))
         screen.blit(img, (1340, 40))
-
 
     def add_click_effect(self, x, y):
         self.click_effects.append({
@@ -273,6 +293,11 @@ class Player:
 
         self.draw_click_effects(screen)
 
+        if self.is_invulnerable:
+            # Мигаем с частотой ~10 раз в секунду
+            if pygame.time.get_ticks() % 200 < 100:
+                return  # в этот кадр не рисуем — эффект "прозрачности"
+
         # 🛡️ Безопасное получение текущего спрайта
         if (self.direction in self.sprites and
                 self.sprites[self.direction] and
@@ -340,9 +365,9 @@ class Enemy:
 
                 self.x += step_x
                 self.y += step_y
-                print(distance)
-                if distance <= 10:
-                    player.hp -= 20
+                if distance <= 30:
+                    player.take_damage(20)
+
         else:
             self.is_chasing = False
 
@@ -818,8 +843,9 @@ class Game:
                     self.enemy_2.draw(screen)
 
                 self.player.move(self.grid.house, dt)
+                self.player.update_invulnerability()
                 self.player.draw(screen)
-                self.player.health(100)
+                self.player.health()
             pygame.display.flip()
             clock.tick(60)
 
