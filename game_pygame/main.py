@@ -714,6 +714,49 @@ class Grid:
         min_x, max_x, min_y, max_y = self.location.camera_bounds
         self.camera.set_bounds(min_x, max_x, min_y, max_y)
 
+class Fishing:
+    def __init__(self, camera):
+        self.camera = camera
+        self.fishing_trigger = pygame.Rect(-500, 1130, 3000, 90)
+        self.near_fishing_flag = False
+
+        self.objects = ['fish', 'fish', 'fish', 'boot', 'key']
+        self.objects = random.sample(self.objects, len(self.objects))
+        self.timer_list = [random.uniform(1.0, 5.0) for _ in range(5)]
+
+        self.num_obj = 0
+        self.state = 'waiting'
+
+        self.bite_time = 0
+
+    def player_is_near(self, player_world_x, player_world_y):
+        camera_coord = self.camera.step()
+        player_point = pygame.Rect(player_world_x, player_world_y, 1, 1)
+
+        self.draw_rect = pygame.Rect(
+            self.fishing_trigger.x + camera_coord[0],
+            self.fishing_trigger.y + camera_coord[1],
+            self.fishing_trigger.width,
+            self.fishing_trigger.height
+        )
+
+        pygame.draw.rect(screen, (0, 255, 0), self.draw_rect, 2)
+
+        if player_point.colliderect(self.draw_rect):
+            self.near_fishing_flag = True
+            return True
+        self.near_fishing_flag = False
+        return False
+
+    def is_fishing(self, dt):
+        if self.state == 'waiting':
+            return
+
+        
+
+
+
+
 class Game:
     def __init__(self):
         #Данные первой локации
@@ -739,7 +782,7 @@ class Game:
             player_spawn=(2050, 600)
         )
 
-        #Данные второй локации
+        #Данные подземелья
         location2_house = [
             {'rect': pygame.Rect(500, 400, 100, 160), 'image': pygame.image.load("pic/house/statue.png")},
             {'rect': pygame.Rect(0, 0, screen_width + 2000, 170), 'image': None},  # верхняя граница
@@ -750,6 +793,22 @@ class Game:
 
         self.location2 = Location(
             name="castle",
+            background_path="pic/bg_21.jpg",  # новый фон
+            house_data=location2_house,
+            camera_bounds=(-710, -5, -420, -5),
+            player_spawn=(800, 400)  # где появится игрок в замке
+        )
+
+        location3_house = [
+            {'rect': pygame.Rect(500, 400, 100, 160), 'image': pygame.image.load("pic/house/statue.png")},
+            {'rect': pygame.Rect(0, 0, screen_width + 2000, 170), 'image': None},  # верхняя граница
+            {'rect': pygame.Rect(0, screen_height + 300, screen_width + 1000, 150), 'image': None},  # нижняя граница
+            {'rect': pygame.Rect(0, 0, 240, screen_height + 1000), 'image': None},  # левая
+            {'rect': pygame.Rect(screen_width + 530, 0, 240, screen_height + 1000), 'image': None},  # правая
+        ]
+
+        self.location3 = Location(
+            name="house",
             background_path="pic/bg_21.jpg",  # новый фон
             house_data=location2_house,
             camera_bounds=(-710, -5, -420, -5),
@@ -778,6 +837,7 @@ class Game:
         self.npc.set_position(1100, 430)
         self.tips = Tips(self.camera, self.npc, location1_house[0])
         self.tips_for_statue = Tips(self.camera, self.npc, location2_house[0])
+        self.fishing = Fishing(self.camera)
 
         # 👇создаём врага и один раз задаём ему случайную позицию
         self.enemy_1 = Enemy(self.camera, enemy_1)
@@ -873,6 +933,7 @@ class Game:
                         player_screen_x = self.player.world_x + self.camera.step()[0]
                         player_screen_y = self.player.world_y + self.camera.step()[1]
                         self.tips_for_statue.near_build(player_screen_x, player_screen_y, -85, 40)
+                        self.fishing.player_is_near(player_screen_x, player_screen_y)
                         self.tips_for_statue.draw_E_build(screen)
 
                     self.player.move(self.grid.house, dt)
@@ -880,12 +941,11 @@ class Game:
                     self.player.draw(screen)
                     self.player.health()
 
-                pygame.display.flip()
-                clock.tick(60)
             else:
                 self.menu.game_over()
-                pygame.display.flip()
-                clock.tick(60)
+
+            pygame.display.flip()
+            clock.tick(60)
 
 # Запуск игры
 if __name__ == "__main__":
