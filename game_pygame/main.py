@@ -621,7 +621,7 @@ class NPC:
         return False
 
 class Tips:
-    def __init__(self, camera, npc=None, castle_trigger_rect=None):
+    def __init__(self, camera, npc=None, build=None):
         self.camera = camera
         # Загружаем два кадра для анимации
         self.image_E_1 = pygame.image.load('pic/button/button_E_1.png')
@@ -633,7 +633,31 @@ class Tips:
         self.animation_timer = 0
         self.animation_speed = 0.3  # скорость анимации
         self.npc = npc
-        self.castle_trigger_rect = castle_trigger_rect  # 🆕 зона замка
+        self.build = build  # 🆕 зона замка
+
+        self.build_rect = self.build['rect']
+        self.build_trigger = pygame.Rect(
+            self.build_rect.centerx,
+            self.build_rect.centery,
+            150,
+            70
+        )
+        self.near_build_flag = False
+
+    def near_build(self, player_world_x, player_world_y, ofcet_x = 0, ofcet_y = 0):
+        camera_coord = self.camera.step()
+        player_point = pygame.Rect(player_world_x, player_world_y, 1, 1)
+
+        self.build_trigger.x = self.build_rect.centerx + ofcet_x + camera_coord[0]
+        self.build_trigger.y = self.build_rect.centery + ofcet_y + camera_coord[1]
+
+        pygame.draw.rect(screen, (0, 255, 0), self.build_trigger, 2)
+
+        if player_point.colliderect(self.build_trigger):
+            self.near_build_flag = True
+            return True
+        self.near_build_flag = False
+        return False
 
     def update_animation(self):
         """Обновляет анимацию кнопки"""
@@ -656,13 +680,11 @@ class Tips:
             else:
                 screen.blit(self.image_E_2, (screen_x, screen_y))
 
-    def draw_E_castle(self, screen, near):
-        """🆕 Отрисовка подсказки у замка"""
-        if near and self.castle_trigger_rect:
+    def draw_E_build(self, screen):
+        if self.near_build_flag and self.build_trigger:
             self.update_animation()
-            # Центрируем кнопку E над триггером
-            screen_x = self.castle_trigger_rect.centerx + 40
-            screen_y = self.castle_trigger_rect.top - 140
+            screen_x = self.build_trigger.centerx
+            screen_y = self.build_trigger.top - 140
             img = self.image_E_1 if self.current_frame == 0 else self.image_E_2
             screen.blit(img, (screen_x, screen_y))
 
@@ -671,16 +693,6 @@ class Grid:
         self.camera = camera
         self.location = location
         self.house = location.house  # ссылка на здания из локации
-
-        # 🏰 Зона взаимодействия с замком (невидимый квадрат 100x100)
-        castle_rect = self.house[0]['rect']  # первое здание — замок
-        self.castle_trigger = pygame.Rect(
-            castle_rect.centerx,
-            castle_rect.centery,
-            150,
-            70
-        )
-        self.near_castle_flag = False
 
     def draw(self):
         camera_coord = self.camera.step()
@@ -702,29 +714,9 @@ class Grid:
         min_x, max_x, min_y, max_y = self.location.camera_bounds
         self.camera.set_bounds(min_x, max_x, min_y, max_y)
 
-    def near_castle(self, player_world_x, player_world_y):
-        camera_coord = self.camera.step()
-        player_point = pygame.Rect(player_world_x, player_world_y, 1, 1)
-
-        castle_rect = self.house[0]['rect']
-        self.castle_trigger.x = castle_rect.centerx - 150 + camera_coord[0]
-        self.castle_trigger.y = castle_rect.centery + 220 + camera_coord[1]
-        #pygame.draw.rect(screen, (0, 255, 0), self.castle_trigger, 2)
-
-        if player_point.colliderect(self.castle_trigger):
-            self.near_castle_flag = True
-            return True
-        self.near_castle_flag = False
-        return False
-
-    def get_castle_trigger_screen(self):
-        """Возвращает экранные координаты триггера для отрисовки подсказки"""
-        camera_coord = self.camera.step()
-        return self.castle_trigger
-
 class Game:
     def __init__(self):
-        # 📦 Данные первой локации
+        #Данные первой локации
         location1_house = [
             {'rect': pygame.Rect(750, 100, 300, 400), 'image': pygame.image.load("pic/house/castle.png")},
             {'rect': pygame.Rect(1250, 330, 200, 200), 'image': pygame.image.load("pic/house/house_start.png")},
@@ -743,13 +735,12 @@ class Game:
             name="village",
             background_path="pic/bg_2.jpg",
             house_data=location1_house,
-            camera_bounds=(-710, -5, -420, -5),  # подгоните под карту
+            camera_bounds=(-710, -5, -420, -5),
             player_spawn=(2050, 600)
         )
 
-        # 🏰 Данные второй локации (замок)
+        #Данные второй локации
         location2_house = [
-            # Пример: только замок и новые препятствия
             {'rect': pygame.Rect(500, 400, 100, 160), 'image': pygame.image.load("pic/house/statue.png")},
             {'rect': pygame.Rect(0, 0, screen_width + 2000, 170), 'image': None},  # верхняя граница
             {'rect': pygame.Rect(0, screen_height + 300, screen_width + 1000, 150), 'image': None}, # нижняя граница
@@ -785,7 +776,8 @@ class Game:
         # NPC только для первой локации
         self.npc = NPC("Торговец", npc_frames, first_npc, self.camera)
         self.npc.set_position(1100, 430)
-        self.tips = Tips(self.camera, self.npc, self.grid.get_castle_trigger_screen())
+        self.tips = Tips(self.camera, self.npc, location1_house[0])
+        self.tips_for_statue = Tips(self.camera, self.npc, location2_house[0])
 
         # 👇создаём врага и один раз задаём ему случайную позицию
         self.enemy_1 = Enemy(self.camera, enemy_1)
@@ -803,9 +795,6 @@ class Game:
             min_x=300, max_x=screen_width + 430,
             min_y=200, max_y=screen_height + 200
         )
-
-        # 🚪 Триггер перехода у замка (невидимый прямоугольник)
-        self.castle_trigger = pygame.Rect(900, 350, 100, 80)  # подгоните под вход в замок
 
     def _switch_location(self, new_location: Location):
         """Переключает локацию и переносит игрока"""
@@ -837,7 +826,7 @@ class Game:
                     self.running = False
                     # 🆕 Открытие замка по E
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_e:
-                    if self.current_location == self.location1 and self.grid.near_castle_flag:
+                    if self.current_location == self.location1 and self.tips.near_build_flag:
                         self._switch_location(self.location2)
 
             if self.menu.status:
@@ -858,13 +847,14 @@ class Game:
                         #Проверка близости к NPC
                         player_screen_x = self.player.world_x + self.camera.step()[0]
                         player_screen_y = self.player.world_y + self.camera.step()[1]
+
                         near_npc = self.npc.near(player_screen_x, player_screen_y)
                         self.npc.interaction()
                         self.tips.draw_E(screen, near_npc)
 
                         #Проверка близости к замку
-                        near_castle = self.grid.near_castle(player_screen_x, player_screen_y)
-                        self.tips.draw_E_castle(screen, near_castle)
+                        self.tips.near_build(player_screen_x, player_screen_y, -110, 200)
+                        self.tips.draw_E_build(screen)
 
                     elif self.current_location == self.location2:
 
@@ -878,10 +868,16 @@ class Game:
 
                             enemy.draw(screen)
 
+                        player_screen_x = self.player.world_x + self.camera.step()[0]
+                        player_screen_y = self.player.world_y + self.camera.step()[1]
+                        self.tips_for_statue.near_build(player_screen_x, player_screen_y, -85, 40)
+                        self.tips_for_statue.draw_E_build(screen)
+
                     self.player.move(self.grid.house, dt)
                     self.player.update_invulnerability()
                     self.player.draw(screen)
                     self.player.health()
+                    
                 pygame.display.flip()
                 clock.tick(60)
             else:
