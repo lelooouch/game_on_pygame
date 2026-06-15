@@ -828,14 +828,16 @@ class Game:
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_e:
                     if self.current_location == self.location1 and self.tips.near_build_flag:
                         self._switch_location(self.location2)
+                    elif self.current_location == self.location2 and self.tips_for_statue.near_build_flag:
+                        self.player.hp = 100
 
             if self.menu.status:
-                # 🗣️ Обновляем диалог (только если есть активный NPC)
+                #Обновляем диалог (только если есть активный NPC)
                 if self.current_location == self.location1:
                     self.npc.update_dialog(events)
 
                 if self.current_location == self.location1 and self.npc.is_interactive:
-                    # 🎭 Диалоговый режим
+                    #Диалоговый режим
                     self.npc.draw_dialog(screen)
                 else:
                     self.grid.draw()
@@ -877,14 +879,13 @@ class Game:
                     self.player.update_invulnerability()
                     self.player.draw(screen)
                     self.player.health()
-                    
+
                 pygame.display.flip()
                 clock.tick(60)
             else:
                 self.menu.game_over()
                 pygame.display.flip()
                 clock.tick(60)
-
 
 # Запуск игры
 if __name__ == "__main__":
