@@ -85,20 +85,19 @@ class Camera:
         return [self.camera_x, self.camera_y]
 
 class Player:
-    def __init__(self, x, y, camera):
+    def __init__(self, x, y, camera, menu):
         # Мировые координаты
         self.world_x = x
         self.world_y = y
         self.speed = 3
         self.moving = False
 
+        self.menu = menu
+
         self.hp = 100
         self.camera = camera
         self.hp_bar = hp_bar
 
-        # 🎭 Загрузка спрайтов для 4 направлений
-        # Формат: "anim/player/{direction}/{frame}.png"
-        # direction: 'up', 'down', 'left', 'right'
         self.sprites = {}
         for direction in ['up', 'down', 'left', 'right']:
             frames = []
@@ -115,21 +114,20 @@ class Player:
                     break
             if frames:
                 self.sprites[direction] = frames
-
         # Текущее состояние анимации
         self.direction = 'down'  # направление по умолчанию
         self.current_frame = 0
         self.animation_timer = 0
         self.animation_speed = 0.08  # секунд на кадр (меньше = быстрее)
 
-        # Хитбокс (возьмём размер из первого загруженного спрайта)
+        # Хитбокс
         if self.sprites:
             first_sprite = next(iter(self.sprites.values()))[0]
             self.rect = first_sprite.get_rect()
         else:
             self.rect = pygame.Rect(0, 0, 32, 32)  # фолбэк
 
-        # Эффект клика (ваш существующий код)
+        # Эффект клика
         self.click_frames = []
         for i in range(1, 9):
             try:
@@ -162,9 +160,12 @@ class Player:
             self.is_invulnerable = False
 
     def health(self):
-        img = pygame.image.load(hp_bar[self.hp])
-        img = pygame.transform.scale(img, (int(img.get_width() * 0.75), int(img.get_height() * 0.75)))
-        screen.blit(img, (1340, 40))
+        if self.hp >= 0:
+            img = pygame.image.load(hp_bar[self.hp])
+            img = pygame.transform.scale(img, (int(img.get_width() * 0.75), int(img.get_height() * 0.75)))
+            screen.blit(img, (1340, 40))
+        else:
+            self.menu.status = False
 
     def add_click_effect(self, x, y):
         self.click_effects.append({
@@ -305,13 +306,49 @@ class Player:
 
             current_sprite = self.sprites[self.direction][self.current_frame]
             screen.blit(current_sprite, (screen_x, screen_y))
-        else:
-            # 🔴 Фолбэк: красный квадрат, если спрайт не найден
-            # Поможет сразу увидеть проблему при отладке
-            pygame.draw.rect(screen, (255, 0, 0), (screen_x, screen_y, 32, 32))
-            # Для продакшена можно заменить на заглушку:
-            # if self.sprites and 'down' in self.sprites and self.sprites['down']:
-            #     screen.blit(self.sprites['down'][0], (screen_x, screen_y))
+        # else:
+        #     # 🔴 Фолбэк: красный квадрат, если спрайт не найден
+        #     # Поможет сразу увидеть проблему при отладке
+        #     pygame.draw.rect(screen, (255, 0, 0), (screen_x, screen_y, 32, 32))
+        #     # Для продакшена можно заменить на заглушку:
+        #     # if self.sprites and 'down' in self.sprites and self.sprites['down']:
+        #     #     screen.blit(self.sprites['down'][0], (screen_x, screen_y))
+
+class Menu:
+    def __init__(self):
+        self.status = True
+        self.bliding = True
+
+    def game_over(self):
+        if self.bliding:
+            for alpha in range(0, 256, 5):  # шаг 5 — скорость затемнения
+                overlay = pygame.Surface((screen_width, screen_height))
+                overlay.fill((0, 0, 0))
+                overlay.set_alpha(alpha)
+                screen.blit(overlay, (0, 0))
+                pygame.display.flip()
+                pygame.time.delay(15)  # задержка между кадрами (мс)
+
+        self.bliding = False
+
+        img_gameover = pygame.image.load('pic/menu/gameover.jpg')
+        img_gameover = pygame.transform.scale(img_gameover, (screen_width, screen_height))
+
+        img_easter_egg = pygame.image.load('pic/menu/pash.jpg')
+        img_easter_egg = pygame.transform.scale(img_easter_egg, (screen_width, screen_height))
+
+        screen.blit(img_gameover, (0, 0))
+        pygame.display.flip()
+        pygame.time.delay(3000)
+
+        screen.blit(img_easter_egg, (0, 0))
+        pygame.display.flip()
+        pygame.time.delay(200)
+
+        screen.blit(img_gameover, (0, 0))
+
+    def pause(self):
+        pass
 
 class Enemy:
     def __init__(self, camera, enemy_base):
@@ -321,7 +358,7 @@ class Enemy:
         self.x = 0
         self.y = 0
 
-        # 🎭 Загружаем кадры анимации
+        # кадры анимации
         self.anim = []
         frame_id = 1
         while True:
@@ -729,6 +766,7 @@ class Game:
         )
 
         self.camera = Camera(-700, -200, screen_width, screen_height)
+        self.menu = Menu()
         self.current_location = self.location1
         self.grid = Grid(self.camera, self.current_location)
         self.grid.update_camera_bounds()  # применяем границы
@@ -740,7 +778,7 @@ class Game:
         self.running = True
         self.player = Player(self.current_location.player_spawn[0],
                              self.current_location.player_spawn[1],
-                             self.camera)
+                             self.camera, self.menu)
         self.last_time = pygame.time.get_ticks()
 
 
@@ -753,6 +791,7 @@ class Game:
         self.enemy_1 = Enemy(self.camera, enemy_1)
         self.enemy_2 = Enemy(self.camera, enemy_1)
 
+        self.enemies = [self.enemy_1, self.enemy_2]
 
         # Границы для спавна
         self.enemy_1.random_location(
@@ -801,53 +840,54 @@ class Game:
                     if self.current_location == self.location1 and self.grid.near_castle_flag:
                         self._switch_location(self.location2)
 
-            # 🗣️ Обновляем диалог (только если есть активный NPC)
-            if self.current_location == self.location1:
-                self.npc.update_dialog(events)
-
-            if self.current_location == self.location1 and self.npc.is_interactive:
-                # 🎭 Диалоговый режим
-                self.npc.draw_dialog(screen)
-            else:
-                self.grid.draw()
-                # Логика для первой локации
+            if self.menu.status:
+                # 🗣️ Обновляем диалог (только если есть активный NPC)
                 if self.current_location == self.location1:
-                    self.npc.update_animation(dt)
-                    self.npc.anim_draw(screen)
+                    self.npc.update_dialog(events)
 
-                    # Проверка близости к NPC
-                    player_screen_x = self.player.world_x + self.camera.step()[0]
-                    player_screen_y = self.player.world_y + self.camera.step()[1]
-                    near_npc = self.npc.near(player_screen_x, player_screen_y)
-                    self.npc.interaction()
-                    self.tips.draw_E(screen, near_npc)
+                if self.current_location == self.location1 and self.npc.is_interactive:
+                    # 🎭 Диалоговый режим
+                    self.npc.draw_dialog(screen)
+                else:
+                    self.grid.draw()
+                    #Логика для первой локации
+                    if self.current_location == self.location1:
+                        self.npc.update_animation(dt)
+                        self.npc.anim_draw(screen)
 
-                    # 🆕 Проверка близости к замку (мировые координаты!)
-                    near_castle = self.grid.near_castle(player_screen_x, player_screen_y)
-                    self.tips.draw_E_castle(screen, near_castle)
+                        #Проверка близости к NPC
+                        player_screen_x = self.player.world_x + self.camera.step()[0]
+                        player_screen_y = self.player.world_y + self.camera.step()[1]
+                        near_npc = self.npc.near(player_screen_x, player_screen_y)
+                        self.npc.interaction()
+                        self.tips.draw_E(screen, near_npc)
 
-                elif self.current_location == self.location2:
-                    self.enemy_1.update_animation(dt)
-                    self.enemy_1.chase_player(self.player)
+                        #Проверка близости к замку
+                        near_castle = self.grid.near_castle(player_screen_x, player_screen_y)
+                        self.tips.draw_E_castle(screen, near_castle)
 
-                    self.enemy_2.update_animation(dt)
-                    self.enemy_2.chase_player(self.player)
+                    elif self.current_location == self.location2:
 
-                    # Если не преследует — используем старое поведение (синусоида)
-                    if not self.enemy_1.is_chasing:
-                        self.enemy_1.move()
-                    if not self.enemy_2.is_chasing:
-                        self.enemy_2.move()
+                        for enemy in self.enemies:
+                            enemy.update_animation(dt)
+                            enemy.chase_player(self.player)
 
-                    self.enemy_1.draw(screen)
-                    self.enemy_2.draw(screen)
+                        # Если не преследует
+                            if not enemy.is_chasing:
+                                enemy.move()
 
-                self.player.move(self.grid.house, dt)
-                self.player.update_invulnerability()
-                self.player.draw(screen)
-                self.player.health()
-            pygame.display.flip()
-            clock.tick(60)
+                            enemy.draw(screen)
+
+                    self.player.move(self.grid.house, dt)
+                    self.player.update_invulnerability()
+                    self.player.draw(screen)
+                    self.player.health()
+                pygame.display.flip()
+                clock.tick(60)
+            else:
+                self.menu.game_over()
+                pygame.display.flip()
+                clock.tick(60)
 
 
 # Запуск игры
