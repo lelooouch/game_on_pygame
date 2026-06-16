@@ -98,6 +98,8 @@ class Player:
         self.camera = camera
         self.hp_bar = hp_bar
 
+        self.is_fishing = False
+
         self.sprites = {}
         for direction in ['up', 'down', 'left', 'right']:
             frames = []
@@ -294,12 +296,15 @@ class Player:
 
         self.draw_click_effects(screen)
 
+        if self.is_fishing:
+            return
+
         if self.is_invulnerable:
             # Мигаем с частотой ~10 раз в секунду
             if pygame.time.get_ticks() % 200 < 100:
                 return  # в этот кадр не рисуем — эффект "прозрачности"
 
-        # 🛡️ Безопасное получение текущего спрайта
+        # 🛡Безопасное получение текущего спрайта
         if (self.direction in self.sprites and
                 self.sprites[self.direction] and
                 0 <= self.current_frame < len(self.sprites[self.direction])):
@@ -715,47 +720,125 @@ class Grid:
         self.camera.set_bounds(min_x, max_x, min_y, max_y)
 
 class Fishing:
-    def __init__(self, camera):
+    def __init__(self, camera, player):
         self.camera = camera
+        self.player = player  # ссылка на игрока, чтобы менять спрайт
         self.fishing_trigger = pygame.Rect(-500, 1130, 3000, 90)
         self.near_fishing_flag = False
 
-        self.objects = ['fish', 'fish', 'fish', 'boot', 'key']
-        self.objects = random.sample(self.objects, len(self.objects))
-        self.timer_list = [random.uniform(1.0, 5.0) for _ in range(5)]
+        self.objects = ['рыба', 'рыба', 'старый сапог', 'ржавый ключ']
 
-        self.num_obj = 0
-        self.state = 'waiting'
+        # Состояния: 'idle', 'waiting', 'bite_window', 'result'
+        self.state = 'idle'
+        self.timer = 0
+        self.bite_duration = 0  # сколько секунд окно активно
+        self.catch_result = ""
 
-        self.bite_time = 0
+        # Загружаем спрайт с удочкой (один кадр для всех направлений или свой набор)
+        self.fishing_sprite = pygame.image.load("anim/character/is_fishing/fishing.png")
+        self.fishing_sprite = pygame.transform.scale(
+            self.fishing_sprite,
+            (int(self.fishing_sprite.get_width() * 0.1),
+             int(self.fishing_sprite.get_height() * 0.1))
+        )
+        # Шрифт для подсказок
+        self.font = pygame.font.Font("fonts/diolog.ttf", 36)
+        self.small_font = pygame.font.Font("fonts/diolog.ttf", 24)
 
     def player_is_near(self, player_world_x, player_world_y):
-        camera_coord = self.camera.step()
+        """Проверяет, находится ли игрок в зоне рыбалки"""
         player_point = pygame.Rect(player_world_x, player_world_y, 1, 1)
 
-        self.draw_rect = pygame.Rect(
+        # Отладочная отрисовка зоны
+        camera_coord = self.camera.step()
+        draw_rect = pygame.Rect(
             self.fishing_trigger.x + camera_coord[0],
             self.fishing_trigger.y + camera_coord[1],
             self.fishing_trigger.width,
             self.fishing_trigger.height
         )
+        #pygame.draw.rect(screen, (0, 255, 0), draw_rect, 2)  # раскомментируй для отладки
 
-        pygame.draw.rect(screen, (0, 255, 0), self.draw_rect, 2)
-
-        if player_point.colliderect(self.draw_rect):
+        if player_point.colliderect(draw_rect):
             self.near_fishing_flag = True
             return True
         self.near_fishing_flag = False
         return False
 
-    def is_fishing(self, dt):
-        if self.state == 'waiting':
+    def start_fishing(self):
+        """Запускает процесс рыбалки (вызывается при нажатии E)"""
+        if self.state != 'idle':
             return
 
-        
+        self.state = 'waiting'
+        self.timer = 0
+        self.bite_duration = random.uniform(1.0, 5.0)  # Ждём от 2 до 5 секунд
+        self.player.is_fishing = True  # Меняем спрайт игрока
 
+    def update(self, dt, events):
+        """Обновляет состояние рыбалки. Возвращает True, если рыбалка активна."""
+        if self.state == 'idle':
+            return False
 
+        # --- СОСТОЯНИЕ: ОЖИДАНИЕ ПОКЛЁВКИ ---
+        if self.state == 'waiting':
+            self.timer += dt
+            # Рисуем подсказку "Ждём..."
+            text = self.font.render("ждём поклёвку...", True, (255, 255, 255))
+            screen.blit(text, (screen_width // 2 - text.get_width() // 2, 100))
 
+            # Если время вышло — переходим в окно подсечки
+            if self.timer >= self.bite_duration:
+                self.state = 'bite_window'
+                self.timer = 0
+                self.bite_duration = random.uniform(1.0, 2.0)  # Окно от 1 до 2 секунд
+            return True
+
+        # --- СОСТОЯНИЕ: ОКНО ПОДСЕЧКИ ---
+        elif self.state == 'bite_window':
+            self.timer += dt
+            # Рисуем подсказку "!!! КЛЮЁТ! ЖМИ ПРОБЕЛ !!!"
+            text = self.font.render("!!! КЛЮЁТ! ЖМИ [ПРОБЕЛ] !!!", True, (255, 255, 0))
+            screen.blit(text, (screen_width // 2 - text.get_width() // 2, 100))
+
+            # Проверяем нажатие пробела
+            for event in events:
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                    # Успел! Поймали рыбу
+                    self.state = 'result'
+                    self.timer = 0
+                    self.catch_result = f"поймано: {random.choice(self.objects)}!"
+                    return True
+
+            # Если время окна вышло — рыба сорвалась
+            if self.timer >= self.bite_duration:
+                self.state = 'result'
+                self.timer = 0
+                self.catch_result = "сорвалось... слишком поздно!"
+            return True
+
+        elif self.state == 'result':
+            self.timer += dt
+            # Рисуем результат
+            color = (0, 255, 0) if "поймано" in self.catch_result else (255, 100, 100)
+            text = self.font.render(self.catch_result, True, color)
+            screen.blit(text, (screen_width // 2 - text.get_width() // 2, 100))
+
+            # Через 3 секунды возвращаемся в idle
+            if self.timer >= 3.0:
+                self.state = 'idle'
+                self.player.is_fishing = False  # Возвращаем обычный спрайт
+            return True
+
+        return False
+
+    def draw_fishing_sprite(self, screen):
+        """Рисует персонажа с удочкой вместо обычного спрайта"""
+        if self.fishing_sprite and self.player.is_fishing:
+            camera_coord = self.camera.step()
+            screen_x = self.player.world_x + camera_coord[0]
+            screen_y = self.player.world_y + camera_coord[1]
+            screen.blit(self.fishing_sprite, (screen_x, screen_y))
 
 class Game:
     def __init__(self):
@@ -831,13 +914,12 @@ class Game:
                              self.camera, self.menu)
         self.last_time = pygame.time.get_ticks()
 
-
         # NPC только для первой локации
         self.npc = NPC("Торговец", npc_frames, first_npc, self.camera)
         self.npc.set_position(1100, 430)
         self.tips = Tips(self.camera, self.npc, location1_house[0])
         self.tips_for_statue = Tips(self.camera, self.npc, location2_house[0])
-        self.fishing = Fishing(self.camera)
+        self.fishing = Fishing(self.camera, self.player)
 
         # 👇создаём врага и один раз задаём ему случайную позицию
         self.enemy_1 = Enemy(self.camera, enemy_1)
@@ -890,6 +972,8 @@ class Game:
                         self._switch_location(self.location2)
                     elif self.current_location == self.location2 and self.tips_for_statue.near_build_flag:
                         self.player.hp = 100
+                    elif self.fishing.near_fishing_flag and self.fishing.state == 'idle':
+                        self.fishing.start_fishing()
 
             if self.menu.status:
                 #Обновляем диалог (только если есть активный NPC)
@@ -901,6 +985,9 @@ class Game:
                     self.npc.draw_dialog(screen)
                 else:
                     self.grid.draw()
+
+                    block_player = False
+
                     #Логика для первой локации
                     if self.current_location == self.location1:
                         self.npc.update_animation(dt)
@@ -936,10 +1023,16 @@ class Game:
                         self.fishing.player_is_near(player_screen_x, player_screen_y)
                         self.tips_for_statue.draw_E_build(screen)
 
-                    self.player.move(self.grid.house, dt)
-                    self.player.update_invulnerability()
-                    self.player.draw(screen)
-                    self.player.health()
+                        is_fishing_active = self.fishing.update(dt, events)
+                        if is_fishing_active:
+                            self.fishing.draw_fishing_sprite(screen)
+                            block_player = True
+
+                    if not block_player:
+                        self.player.move(self.grid.house, dt)
+                        self.player.update_invulnerability()
+                        self.player.draw(screen)
+                        self.player.health()
 
             else:
                 self.menu.game_over()
