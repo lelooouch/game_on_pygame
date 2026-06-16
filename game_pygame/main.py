@@ -869,7 +869,7 @@ class Game:
         location2_house = [
             {'rect': pygame.Rect(500, 400, 100, 160), 'image': pygame.image.load("pic/house/statue.png")},
             {'rect': pygame.Rect(0, 0, screen_width + 2000, 170), 'image': None},  # верхняя граница
-            {'rect': pygame.Rect(0, screen_height + 300, screen_width + 1000, 150), 'image': None}, # нижняя граница
+            {'rect': pygame.Rect(0, screen_height + 300, screen_width + 520, 150), 'image': None}, # нижняя граница
             {'rect': pygame.Rect(0, 0, 240, screen_height + 1000), 'image': None}, # левая
             {'rect': pygame.Rect(screen_width + 530, 0, 240, screen_height + 1000), 'image': None}, # правая
         ]
@@ -917,8 +917,11 @@ class Game:
         # NPC только для первой локации
         self.npc = NPC("Торговец", npc_frames, first_npc, self.camera)
         self.npc.set_position(1100, 430)
+
         self.tips = Tips(self.camera, self.npc, location1_house[0])
         self.tips_for_statue = Tips(self.camera, self.npc, location2_house[0])
+        self.tips_for_river = Tips(self.camera, self.npc, location2_house[2])
+
         self.fishing = Fishing(self.camera, self.player)
 
         # 👇создаём врага и один раз задаём ему случайную позицию
@@ -1019,9 +1022,14 @@ class Game:
 
                         player_screen_x = self.player.world_x + self.camera.step()[0]
                         player_screen_y = self.player.world_y + self.camera.step()[1]
+
+                        self.tips_for_river.near_build(player_screen_x, player_screen_y, 0, -150)
                         self.tips_for_statue.near_build(player_screen_x, player_screen_y, -85, 40)
+
                         self.fishing.player_is_near(player_screen_x, player_screen_y)
+
                         self.tips_for_statue.draw_E_build(screen)
+                        self.tips_for_river.draw_E_build(screen)
 
                         is_fishing_active = self.fishing.update(dt, events)
                         if is_fishing_active:
