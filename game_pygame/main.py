@@ -25,7 +25,7 @@ clock = pygame.time.Clock()
 class Location:
     """Хранит все данные одной локации: фон, здания, границы камеры, спавн игрока"""
 
-    def __init__(self, name, background_path, house_data, camera_bounds, player_spawn):
+    def __init__(self, name, background_path, house_data, camera_bounds, player_spawn, background_size=None):
         self.name = name
         self.background_path = background_path
         self.house_data = house_data  # список словарей {'rect': ..., 'image': ...}
@@ -34,7 +34,9 @@ class Location:
 
         # Загружаем фон один раз при создании
         self.background = pygame.image.load(background_path)
-        self.background = pygame.transform.scale(self.background, (WORLD_WIDTH, WORLD_HEIGHT))
+        if background_size is None:
+            background_size = (WORLD_WIDTH, WORLD_HEIGHT)
+        self.background = pygame.transform.scale(self.background, background_size)
 
         # Создаём rect'ы для зданий
         self.house = []
@@ -50,13 +52,7 @@ class Camera:
         self.camera_y = camera_y
         self.screen_width = screen_width
         self.screen_height = screen_height
-        self.step_cord = 2
-
-        # 🆕 Границы движения камеры (по умолчанию — широкие)
-        self.min_x = -3000
-        self.max_x = 3000
-        self.min_y = -3000
-        self.max_y = 3000
+        self.step_cord = 1
 
     def set_bounds(self, min_x, max_x, min_y, max_y):
         """Устанавливает новые границы для камеры"""
@@ -722,8 +718,8 @@ class Grid:
 class Fishing:
     def __init__(self, camera, player):
         self.camera = camera
-        self.player = player  # ссылка на игрока, чтобы менять спрайт
-        self.fishing_trigger = pygame.Rect(-500, 1130, 3000, 90)
+        self.player = player
+        self.fishing_trigger = pygame.Rect(740, 1130, 150, 70)
         self.near_fishing_flag = False
 
         self.objects = ['рыба', 'рыба', 'старый сапог', 'ржавый ключ']
@@ -757,7 +753,7 @@ class Fishing:
             self.fishing_trigger.width,
             self.fishing_trigger.height
         )
-        #pygame.draw.rect(screen, (0, 255, 0), draw_rect, 2)  # раскомментируй для отладки
+        pygame.draw.rect(screen, (0, 255, 0), draw_rect, 2)  # раскомментируй для отладки
 
         if player_point.colliderect(draw_rect):
             self.near_fishing_flag = True
@@ -885,7 +881,6 @@ class Game:
         )
 
         location3_house = [
-            {'rect': pygame.Rect(500, 400, 100, 160), 'image': pygame.image.load("pic/house/statue.png")},
             {'rect': pygame.Rect(0, 0, screen_width + 2000, 170), 'image': None},  # верхняя граница
             {'rect': pygame.Rect(0, screen_height + 300, screen_width + 1000, 150), 'image': None},  # нижняя граница
             {'rect': pygame.Rect(0, 0, 240, screen_height + 1000), 'image': None},  # левая
@@ -894,10 +889,11 @@ class Game:
 
         self.location3 = Location(
             name="house",
-            background_path="pic/bg_21.jpg",  # новый фон
-            house_data=location2_house,
-            camera_bounds=(-710, -5, -420, -5),
-            player_spawn=(800, 400)  # где появится игрок в замке
+            background_path="pic/bg_3.jpg",
+            house_data=location3_house,
+            camera_bounds=(-100, -1005, -100, -1005),  # 👇 более узкие границы для маленькой локации
+            player_spawn=(1030, 840),
+            background_size=(screen_width + 900, screen_height + 1000)  # 👇 размер фона под дом
         )
 
         self.camera = Camera(-700, -200, screen_width, screen_height)
@@ -923,6 +919,7 @@ class Game:
         self.tips = Tips(self.camera, self.npc, location1_house[0])
         self.tips_for_statue = Tips(self.camera, self.npc, location2_house[0])
         self.tips_for_river = Tips(self.camera, self.npc, location2_house[2])
+        self.tips_for_house = Tips(self.camera, self.npc, location1_house[1])
 
         self.fishing = Fishing(self.camera, self.player)
 
@@ -952,8 +949,9 @@ class Game:
         # Телепортируем игрока в точку спавна новой локации
         self.player.world_x, self.player.world_y = new_location.player_spawn
         self.player.moving = False
-
-        print(f"🔄 Переход в локацию: {new_location.name}")
+        if self.current_location == self.location3:
+            self.camera.camera_x = self.camera.screen_width // 2 - self.player.world_x + 100
+            self.camera.camera_y = self.camera.screen_height // 2 - self.player.world_y + 120
 
     def run(self):
         while self.running:
@@ -971,14 +969,21 @@ class Game:
                     self.running = False
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     self.running = False
-                    # 🆕 Открытие замка по E
+
+                    #Открытие замка по E
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_e:
-                    if self.current_location == self.location1 and self.tips.near_build_flag:
-                        self._switch_location(self.location2)
-                    elif self.current_location == self.location2 and self.tips_for_statue.near_build_flag:
-                        self.player.hp = 100
-                    elif self.fishing.near_fishing_flag and self.fishing.state == 'idle':
-                        self.fishing.start_fishing()
+
+                    if self.current_location == self.location1:
+                        if self.tips.near_build_flag:
+                            self._switch_location(self.location2)
+                        elif self.tips_for_house.near_build_flag:
+                            self._switch_location(self.location3)
+
+                    elif self.current_location == self.location2:
+                        if self.tips_for_statue.near_build_flag:
+                            self.player.hp = 100
+                        elif self.fishing.near_fishing_flag and self.fishing.state == 'idle':
+                            self.fishing.start_fishing()
 
             if self.menu.status:
                 #Обновляем диалог (только если есть активный NPC)
@@ -1009,6 +1014,9 @@ class Game:
                         #Проверка близости к замку
                         self.tips.near_build(player_screen_x, player_screen_y, -110, 200)
                         self.tips.draw_E_build(screen)
+                        # Проверка близости к дому
+                        self.tips_for_house.near_build(player_screen_x, player_screen_y, -110, 200)
+                        self.tips_for_house.draw_E_build(screen)
 
                     elif self.current_location == self.location2:
 
