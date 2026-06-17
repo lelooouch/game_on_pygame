@@ -1010,7 +1010,7 @@ class Game:
         self.grid.update_camera_bounds()  # применяем границы
 
         #предметы
-        self.key_from_river = {'name': 'key_2',
+        self.key_from_river = {'name': 'Ржавый ключ из канализации',
                                'pic': None}
         self.key_from_fireplace = {'name': 'Грязный ключ из камина',
                                'pic': 'pic/objects/key_from_fireplace.png'}
@@ -1098,7 +1098,7 @@ class Game:
                     elif self.current_location == self.location2:
                         if self.tips_for_statue.near_build_flag:
                             self.player.hp = 100
-                        elif self.fishing.near_fishing_flag and self.fishing.state == 'idle':
+                        elif self.fishing.near_fishing_flag and self.fishing.state == 'idle' and self.key_from_river not in self.player.inventory:
                             self.fishing.start_fishing()
 
                     elif self.current_location == self.location3:
@@ -1157,13 +1157,14 @@ class Game:
                         player_screen_x = self.player.world_x + self.camera.step()[0]
                         player_screen_y = self.player.world_y + self.camera.step()[1]
 
-                        self.tips_for_river.near_build(player_screen_x, player_screen_y, 310, -130)
+                        if self.key_from_river not in self.player.inventory:
+                            self.tips_for_river.near_build(player_screen_x, player_screen_y, 310, -130)
+                            self.tips_for_river.draw_E_build(screen)
+
                         self.tips_for_statue.near_build(player_screen_x, player_screen_y, -85, 40)
-
                         self.fishing.player_is_near(player_screen_x, player_screen_y)
-
                         self.tips_for_statue.draw_E_build(screen)
-                        self.tips_for_river.draw_E_build(screen)
+
 
                         is_fishing_active = self.fishing.update(dt, events, self.key_from_river)
                         if is_fishing_active:
@@ -1184,7 +1185,7 @@ class Game:
                         is_picking_up = self.item_pickup.update(dt, screen)
                         if is_picking_up:
                             block_player = True
-                            
+
                     if not block_player:
                         self.player.move(self.grid.house, dt)
                         self.player.update_invulnerability()
