@@ -881,10 +881,12 @@ class Game:
         )
 
         location3_house = [
-            {'rect': pygame.Rect(0, 0, screen_width + 2000, 170), 'image': None},  # верхняя граница
-            {'rect': pygame.Rect(0, screen_height + 300, screen_width + 1000, 150), 'image': None},  # нижняя граница
-            {'rect': pygame.Rect(0, 0, 240, screen_height + 1000), 'image': None},  # левая
-            {'rect': pygame.Rect(screen_width + 530, 0, 240, screen_height + 1000), 'image': None},  # правая
+            {'rect': pygame.Rect(0, 440, screen_width + 2000, 170), 'image': None},  # верхняя граница
+            {'rect': pygame.Rect(0, 848, 1010, 150), 'image': None},  # нижняя граница
+            {'rect': pygame.Rect(1080, 848, screen_width + 520, 150), 'image': None},  # нижняя граница
+            {'rect': pygame.Rect(390, 0, 240, screen_height + 1000), 'image': None},  # левая
+            {'rect': pygame.Rect(1250, 0, 240, screen_height + 1000), 'image': None},  # правая
+            {'rect': pygame.Rect(1010, 920, 70, 30), 'image': None},
         ]
 
         self.location3 = Location(
@@ -920,10 +922,11 @@ class Game:
         self.tips_for_statue = Tips(self.camera, self.npc, location2_house[0])
         self.tips_for_river = Tips(self.camera, self.npc, location2_house[2])
         self.tips_for_house = Tips(self.camera, self.npc, location1_house[1])
+        self.tips_for_from_house = Tips(self.camera, self.npc, location3_house[5])
 
         self.fishing = Fishing(self.camera, self.player)
 
-        # 👇создаём врага и один раз задаём ему случайную позицию
+        #создаём врага и один раз задаём ему случайную позицию
         self.enemy_1 = Enemy(self.camera, enemy_1)
         self.enemy_2 = Enemy(self.camera, enemy_1)
 
@@ -985,6 +988,10 @@ class Game:
                         elif self.fishing.near_fishing_flag and self.fishing.state == 'idle':
                             self.fishing.start_fishing()
 
+                    elif self.current_location == self.location3:
+                        if self.tips_for_from_house.near_build_flag:
+                            self._switch_location(self.location1)
+
             if self.menu.status:
                 #Обновляем диалог (только если есть активный NPC)
                 if self.current_location == self.location1:
@@ -1015,7 +1022,7 @@ class Game:
                         self.tips.near_build(player_screen_x, player_screen_y, -110, 200)
                         self.tips.draw_E_build(screen)
                         # Проверка близости к дому
-                        self.tips_for_house.near_build(player_screen_x, player_screen_y, -110, 200)
+                        self.tips_for_house.near_build(player_screen_x, player_screen_y, -80, 50)
                         self.tips_for_house.draw_E_build(screen)
 
                     elif self.current_location == self.location2:
@@ -1046,6 +1053,13 @@ class Game:
                             self.fishing.draw_fishing_sprite(screen)
                             block_player = True
 
+                    elif self.current_location == self.location3:
+
+                        player_screen_x = self.player.world_x + self.camera.step()[0]
+                        player_screen_y = self.player.world_y + self.camera.step()[1]
+
+                        self.tips_for_from_house.near_build(player_screen_x, player_screen_y, -60, -110)
+                        self.tips_for_from_house.draw_E_build(screen)
                     if not block_player:
                         self.player.move(self.grid.house, dt)
                         self.player.update_invulnerability()
