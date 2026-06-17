@@ -88,12 +88,15 @@ class Player:
         self.speed = 3
         self.moving = False
 
+        self.inventory = []
+
         self.menu = menu
 
         self.hp = 100
         self.camera = camera
         self.hp_bar = hp_bar
 
+        self.is_picking_up = False
         self.is_fishing = False
 
         self.sprites = {}
@@ -139,6 +142,9 @@ class Player:
         self.last_damage_time = 0  # время последнего полученного урона
         self.damage_cooldown = 1000  # кулдаун в миллисекундах (1000 = 1 секунда)
         self.is_invulnerable = False  # флаг неуязвимости (для эффекта мигания)
+
+    def add_to_inventory(self, object):
+        self.inventory.append(object)
 
     def take_damage(self, amount):
         """Получить урон с учётом кулдауна. Возвращает True, если урон применён."""
@@ -292,7 +298,7 @@ class Player:
 
         self.draw_click_effects(screen)
 
-        if self.is_fishing:
+        if self.is_fishing or self.is_picking_up:
             return
 
         if self.is_invulnerable:
@@ -771,7 +777,7 @@ class Fishing:
         self.bite_duration = random.uniform(1.0, 5.0)  # Ждём от 2 до 5 секунд
         self.player.is_fishing = True  # Меняем спрайт игрока
 
-    def update(self, dt, events):
+    def update(self, dt, events, object):
         """Обновляет состояние рыбалки. Возвращает True, если рыбалка активна."""
         if self.state == 'idle':
             return False
@@ -803,7 +809,10 @@ class Fishing:
                     # Успел! Поймали рыбу
                     self.state = 'result'
                     self.timer = 0
-                    self.catch_result = f"поймано: {random.choice(self.objects)}!"
+                    obj = random.choice(self.objects)
+                    self.catch_result = f"поймано: {obj}!"
+                    if obj == 'ржавый ключ':
+                        self.player.inventory.append(object)
                     return True
 
             # Если время окна вышло — рыба сорвалась
@@ -835,6 +844,101 @@ class Fishing:
             screen_x = self.player.world_x + camera_coord[0]
             screen_y = self.player.world_y + camera_coord[1]
             screen.blit(self.fishing_sprite, (screen_x, screen_y))
+
+class ItemPickup:
+    def __init__(self, camera, player, object):
+        self.camera = camera
+        self.player = player
+        self.object = object
+
+        # Состояние анимации
+        self.is_active = False
+        self.timer = 0
+        self.duration = 2.5  # длительность анимации в секундах
+
+        # Спрайт персонажа при получении предмета
+        try:
+            self.pickup_sprite = pygame.image.load("anim/character/player_is_add.png")
+            self.pickup_sprite = pygame.transform.scale(
+                self.pickup_sprite,
+                (int(self.pickup_sprite.get_width() * 0.1),
+                 int(self.pickup_sprite.get_height() * 0.1))
+            )
+        except FileNotFoundError:
+            self.pickup_sprite = None
+
+        # Картинка предмета (ключ)
+        self.item_image = self.object['pic']
+        self.item_start_y = 0  # начальная позиция Y
+        self.item_current_y = 0  # текущая позиция Y
+        self.item_rise_speed = 30  # скорость подъёма ключика (пикселей в секунду)
+
+        # Шрифт для названия предмета
+        self.font = pygame.font.Font("fonts/diolog.ttf", 28)
+        self.item_name = self.object['name']
+
+    def start_pickup(self, item_data):
+        """Запускает анимацию получения предмета"""
+        if self.is_active:
+            return
+
+        self.is_active = True
+        self.timer = 0
+        self.player.is_picking_up = True  # Блокируем движение
+
+        # Загружаем картинку предмета
+        if item_data and 'pic' in item_data and item_data['pic']:
+            self.item_image = pygame.image.load(item_data['pic'])
+            self.item_image = pygame.transform.scale(
+                self.item_image,
+                (int(self.item_image.get_width() * 0.5),
+                 int(self.item_image.get_height() * 0.5))
+            )
+
+        # Название предмета
+        self.item_name = item_data.get('name', 'Предмет') if item_data else 'Предмет'
+
+        # Начальная позиция ключика (над головой игрока)
+        self.item_start_y = self.player.world_y - 50
+        self.item_current_y = self.item_start_y
+
+    def update(self, dt, screen):
+        """Обновляет анимацию. Возвращает True, если анимация активна."""
+        if not self.is_active:
+            return False
+
+        self.timer += dt
+
+        # Поднимаем ключик вверх
+        self.item_current_y -= self.item_rise_speed * dt
+
+        # Рисуем спрайт персонажа с анимацией получения
+        camera_coord = self.camera.step()
+        screen_x = self.player.world_x + camera_coord[0]
+        screen_y = self.player.world_y + camera_coord[1]
+
+        if self.pickup_sprite:
+            screen.blit(self.pickup_sprite, (screen_x, screen_y))
+
+        # Рисуем поднимающийся ключик
+        if self.item_image:
+            item_screen_x = screen_x + 20  # смещение по X от персонажа
+            item_screen_y = self.item_current_y + camera_coord[1]
+            screen.blit(self.item_image, (item_screen_x, item_screen_y))
+
+            # Рисуем название предмета над ключиком
+            text = self.font.render(self.item_name, True, (255, 255, 255))
+            text_x = item_screen_x - text.get_width() // 2 + self.item_image.get_width() // 2
+            text_y = item_screen_y - 30
+            screen.blit(text, (text_x, text_y))
+
+        # Завершаем анимацию через duration секунд
+        if self.timer >= self.duration:
+            self.is_active = False
+            self.player.is_picking_up = False
+            self.item_image = None
+
+        return True
 
 class Game:
     def __init__(self):
@@ -886,16 +990,17 @@ class Game:
             {'rect': pygame.Rect(1080, 848, screen_width + 520, 150), 'image': None},  # нижняя граница
             {'rect': pygame.Rect(390, 0, 240, screen_height + 1000), 'image': None},  # левая
             {'rect': pygame.Rect(1250, 0, 240, screen_height + 1000), 'image': None},  # правая
-            {'rect': pygame.Rect(1010, 920, 70, 30), 'image': None},
+            {'rect': pygame.Rect(1010, 920, 70, 30), 'image': None}, #выход
+            {'rect': pygame.Rect(905, 550, 130, 60), 'image': None}  # камин
         ]
 
         self.location3 = Location(
             name="house",
             background_path="pic/bg_3.jpg",
             house_data=location3_house,
-            camera_bounds=(-100, -1005, -100, -1005),  # 👇 более узкие границы для маленькой локации
+            camera_bounds=(-100, -1005, -100, -1005),
             player_spawn=(1030, 840),
-            background_size=(screen_width + 900, screen_height + 1000)  # 👇 размер фона под дом
+            background_size=(screen_width + 900, screen_height + 1000)  # размер фона под дом
         )
 
         self.camera = Camera(-700, -200, screen_width, screen_height)
@@ -903,6 +1008,12 @@ class Game:
         self.current_location = self.location1
         self.grid = Grid(self.camera, self.current_location)
         self.grid.update_camera_bounds()  # применяем границы
+
+        #предметы
+        self.key_from_river = {'name': 'key_2',
+                               'pic': None}
+        self.key_from_fireplace = {'name': 'Грязный ключ из камина',
+                               'pic': 'pic/objects/key_from_fireplace.png'}
 
         pygame.mixer.music.load('music/INEKT_-_KYRR_first.mp3')
         pygame.mixer.music.set_volume(0.3)  # громкость от 0.0 до 1.0
@@ -923,8 +1034,10 @@ class Game:
         self.tips_for_river = Tips(self.camera, self.npc, location2_house[2])
         self.tips_for_house = Tips(self.camera, self.npc, location1_house[1])
         self.tips_for_from_house = Tips(self.camera, self.npc, location3_house[5])
+        self.tips_for_fireplace = Tips(self.camera, self.npc, location3_house[6])
 
         self.fishing = Fishing(self.camera, self.player)
+        self.item_pickup = ItemPickup(self.camera, self.player, self.key_from_fireplace)
 
         #создаём врага и один раз задаём ему случайную позицию
         self.enemy_1 = Enemy(self.camera, enemy_1)
@@ -991,6 +1104,10 @@ class Game:
                     elif self.current_location == self.location3:
                         if self.tips_for_from_house.near_build_flag:
                             self._switch_location(self.location1)
+                        elif self.tips_for_fireplace.near_build_flag and self.key_from_fireplace not in self.player.inventory:
+                            self.player.add_to_inventory(self.key_from_fireplace)
+                            self.item_pickup.start_pickup(self.key_from_fireplace)
+                            print(self.player.inventory)
 
             if self.menu.status:
                 #Обновляем диалог (только если есть активный NPC)
@@ -1048,7 +1165,7 @@ class Game:
                         self.tips_for_statue.draw_E_build(screen)
                         self.tips_for_river.draw_E_build(screen)
 
-                        is_fishing_active = self.fishing.update(dt, events)
+                        is_fishing_active = self.fishing.update(dt, events, self.key_from_river)
                         if is_fishing_active:
                             self.fishing.draw_fishing_sprite(screen)
                             block_player = True
@@ -1060,6 +1177,14 @@ class Game:
 
                         self.tips_for_from_house.near_build(player_screen_x, player_screen_y, -60, -110)
                         self.tips_for_from_house.draw_E_build(screen)
+                        if self.key_from_fireplace not in self.player.inventory:
+                            self.tips_for_fireplace.near_build(player_screen_x, player_screen_y, -70, 0)
+                            self.tips_for_fireplace.draw_E_build(screen)
+
+                        is_picking_up = self.item_pickup.update(dt, screen)
+                        if is_picking_up:
+                            block_player = True
+                            
                     if not block_player:
                         self.player.move(self.grid.house, dt)
                         self.player.update_invulnerability()
