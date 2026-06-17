@@ -869,7 +869,9 @@ class Game:
         location2_house = [
             {'rect': pygame.Rect(500, 400, 100, 160), 'image': pygame.image.load("pic/house/statue.png")},
             {'rect': pygame.Rect(0, 0, screen_width + 2000, 170), 'image': None},  # верхняя граница
-            {'rect': pygame.Rect(0, screen_height + 300, screen_width + 520, 150), 'image': None}, # нижняя граница
+            {'rect': pygame.Rect(0, screen_height + 300, 740, 150), 'image': None}, # нижняя граница
+            {'rect': pygame.Rect(840, screen_height + 300, screen_width + 520, 150), 'image': None},  # нижняя граница
+            {'rect': pygame.Rect(740, screen_height + 350, 100, 150), 'image': None},  # нижняя граница
             {'rect': pygame.Rect(0, 0, 240, screen_height + 1000), 'image': None}, # левая
             {'rect': pygame.Rect(screen_width + 530, 0, 240, screen_height + 1000), 'image': None}, # правая
         ]
@@ -1023,7 +1025,7 @@ class Game:
                         player_screen_x = self.player.world_x + self.camera.step()[0]
                         player_screen_y = self.player.world_y + self.camera.step()[1]
 
-                        self.tips_for_river.near_build(player_screen_x, player_screen_y, 0, -150)
+                        self.tips_for_river.near_build(player_screen_x, player_screen_y, 310, -130)
                         self.tips_for_statue.near_build(player_screen_x, player_screen_y, -85, 40)
 
                         self.fishing.player_is_near(player_screen_x, player_screen_y)
