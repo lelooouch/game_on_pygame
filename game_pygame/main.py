@@ -777,7 +777,7 @@ class Fishing:
         self.bite_duration = random.uniform(1.0, 5.0)  # Ждём от 2 до 5 секунд
         self.player.is_fishing = True  # Меняем спрайт игрока
 
-    def update(self, dt, events, object):
+    def update(self, dt, events, object, item_pickup):
         """Обновляет состояние рыбалки. Возвращает True, если рыбалка активна."""
         if self.state == 'idle':
             return False
@@ -813,6 +813,7 @@ class Fishing:
                     self.catch_result = f"поймано: {obj}!"
                     if obj == 'ржавый ключ':
                         self.player.inventory.append(object)
+                        item_pickup.start_pickup(object)
                     return True
 
             # Если время окна вышло — рыба сорвалась
@@ -846,10 +847,9 @@ class Fishing:
             screen.blit(self.fishing_sprite, (screen_x, screen_y))
 
 class ItemPickup:
-    def __init__(self, camera, player, object):
+    def __init__(self, camera, player):
         self.camera = camera
         self.player = player
-        self.object = object
 
         # Состояние анимации
         self.is_active = False
@@ -868,14 +868,14 @@ class ItemPickup:
             self.pickup_sprite = None
 
         # Картинка предмета (ключ)
-        self.item_image = self.object['pic']
+        self.item_image = ''
         self.item_start_y = 0  # начальная позиция Y
         self.item_current_y = 0  # текущая позиция Y
         self.item_rise_speed = 30  # скорость подъёма ключика (пикселей в секунду)
 
         # Шрифт для названия предмета
         self.font = pygame.font.Font("fonts/diolog.ttf", 28)
-        self.item_name = self.object['name']
+        self.item_name = ''
 
     def start_pickup(self, item_data):
         """Запускает анимацию получения предмета"""
@@ -1011,7 +1011,7 @@ class Game:
 
         #предметы
         self.key_from_river = {'name': 'Ржавый ключ из канализации',
-                               'pic': None}
+                               'pic': 'pic/objects/key_from_river.png'}
         self.key_from_fireplace = {'name': 'Грязный ключ из камина',
                                'pic': 'pic/objects/key_from_fireplace.png'}
 
@@ -1037,7 +1037,7 @@ class Game:
         self.tips_for_fireplace = Tips(self.camera, self.npc, location3_house[6])
 
         self.fishing = Fishing(self.camera, self.player)
-        self.item_pickup = ItemPickup(self.camera, self.player, self.key_from_fireplace)
+        self.item_pickup = ItemPickup(self.camera, self.player)
 
         #создаём врага и один раз задаём ему случайную позицию
         self.enemy_1 = Enemy(self.camera, enemy_1)
@@ -1166,9 +1166,13 @@ class Game:
                         self.tips_for_statue.draw_E_build(screen)
 
 
-                        is_fishing_active = self.fishing.update(dt, events, self.key_from_river)
+                        is_fishing_active = self.fishing.update(dt, events, self.key_from_river, self.item_pickup)
                         if is_fishing_active:
                             self.fishing.draw_fishing_sprite(screen)
+                            block_player = True
+
+                        is_picking_up = self.item_pickup.update(dt, screen)
+                        if is_picking_up:
                             block_player = True
 
                     elif self.current_location == self.location3:
