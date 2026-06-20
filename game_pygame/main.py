@@ -323,6 +323,32 @@ class Menu:
         self.status = True
         self.bliding = True
 
+        self.start_bg = pygame.image.load('pic/menu/start_bg.jpg')
+        self.start_bg = pygame.transform.scale(self.start_bg, (screen_width, screen_height))
+
+        # Загруем кнопки (замени пути на свои)
+        self.start_btn = pygame.image.load('pic/button/button_play_1.png')
+        self.start_btn_pressed = pygame.image.load('pic/button/button_play_2.png')
+
+        self.exit_btn = pygame.image.load('pic/button/button_exit_1.png')
+        self.exit_btn_pressed = pygame.image.load('pic/button/button_exit_2.png')
+
+        # Позиции кнопок
+        self.start_btn_x = screen_width // 2 - self.start_btn.get_width() // 2
+        self.start_btn_y = screen_height // 2 - 100
+
+        self.exit_btn_x = screen_width // 2 - self.exit_btn.get_width() // 2
+        self.exit_btn_y = screen_height // 2 + 50
+
+        self.pause_bg = pygame.image.load('pic/menu/pause_screen.png')
+        new_w = int(self.pause_bg.get_width() * 0.75)
+        new_h = int(self.pause_bg.get_height() * 0.75)
+        self.pause_bg = pygame.transform.scale(self.pause_bg, (new_w, new_h))
+        self.pause_bg_x = screen_width // 2 - self.pause_bg.get_width() // 2
+        self.pause_bg_y = screen_height // 2 - self.pause_bg.get_height() // 2
+
+        self.saved_screen = None
+
     def game_over(self):
         if self.bliding:
             for alpha in range(0, 256, 5):  # шаг 5 — скорость затемнения
@@ -338,21 +364,82 @@ class Menu:
         img_gameover = pygame.image.load('pic/menu/gameover.jpg')
         img_gameover = pygame.transform.scale(img_gameover, (screen_width, screen_height))
 
-        img_easter_egg = pygame.image.load('pic/menu/pash.jpg')
-        img_easter_egg = pygame.transform.scale(img_easter_egg, (screen_width, screen_height))
-
         screen.blit(img_gameover, (0, 0))
         pygame.display.flip()
-        pygame.time.delay(3000)
 
-        screen.blit(img_easter_egg, (0, 0))
-        pygame.display.flip()
-        pygame.time.delay(200)
+    def start_screen(self):
+        """Начальный экран с кнопками Start и Exit"""
+        while True:
+            # Рисуем фон
+            screen.blit(self.start_bg, (0, 0))
 
-        screen.blit(img_gameover, (0, 0))
+            # Получаем позицию мыши
+            mouse_pos = pygame.mouse.get_pos()
+            mouse_x, mouse_y = mouse_pos
 
-    def pause(self):
-        pass
+            # Определяем, над какой кнопкой находится курсор
+            start_hovered = (self.start_btn_x <= mouse_x <= self.start_btn_x + self.start_btn.get_width() and
+                             self.start_btn_y <= mouse_y <= self.start_btn_y + self.start_btn.get_height())
+
+            exit_hovered = (self.exit_btn_x <= mouse_x <= self.exit_btn_x + self.exit_btn.get_width() and
+                            self.exit_btn_y <= mouse_y <= self.exit_btn_y + self.exit_btn.get_height())
+
+            # Рисуем кнопки (нажатые при наведении)
+            if start_hovered:
+                screen.blit(self.start_btn_pressed, (self.start_btn_x, self.start_btn_y + 10))
+            else:
+                screen.blit(self.start_btn, (self.start_btn_x, self.start_btn_y))
+
+            if exit_hovered:
+                screen.blit(self.exit_btn_pressed, (self.exit_btn_x, self.exit_btn_y + 10))
+            else:
+                screen.blit(self.exit_btn, (self.exit_btn_x, self.exit_btn_y))
+
+            pygame.display.flip()
+
+            # Обработка событий
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if start_hovered:
+                        return  # Выходим из start_screen, игра начинается
+                    elif exit_hovered:
+                        pygame.quit()
+                        sys.exit()
+
+            clock.tick(60)
+
+    def pause(self, current_screen):
+        self.saved_screen = current_screen.copy()
+
+        while True:
+            # 1. Рисуем сохранённый игровой экран как основу
+            screen.blit(self.saved_screen, (0, 0))
+
+            # 2. Поверх рисуем затемнение (размытие)
+            blur_surface = pygame.Surface((screen_width, screen_height))
+            blur_surface.fill((0, 0, 0))
+            blur_surface.set_alpha(150)
+            screen.blit(blur_surface, (0, 0))
+
+            # 3. Поверх рисуем меню паузы
+            screen.blit(self.pause_bg, (self.pause_bg_x, self.pause_bg_y))
+
+            pygame.display.flip()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    return  # Выходим из паузы
+
+            clock.tick(60)
+
+
 
 class Enemy:
     def __init__(self, camera, enemy_base):
@@ -937,13 +1024,12 @@ class ItemPickup:
 
         return True
 
-
 class Note(ItemPickup):
     def __init__(self, camera, player, text):
         super().__init__(camera, player)
 
         self.text = text
-        self.font = pygame.font.Font("fonts/diolog.ttf", 32)
+        self.font = pygame.font.Font("fonts/kom-post.ttf", 32)
         self.small_font = pygame.font.Font("fonts/diolog.ttf", 24)
 
         # Картинка-фон для текста
@@ -1000,7 +1086,7 @@ class Note(ItemPickup):
 
         for word in words:
             test_line = f"{current_line} {word}".strip()
-            if self.font.size(test_line)[0] <= self.text_max_width:
+            if self.font.size(test_line)[0] <= self.text_max_width - 250:
                 current_line = test_line
             else:
                 if current_line:
@@ -1014,7 +1100,7 @@ class Note(ItemPickup):
         line_height = self.font.get_height() + 10
         for i, line in enumerate(lines):
             text_surface = self.font.render(line, True, self.text_color)
-            screen.blit(text_surface, (text_x, text_y + i * line_height))
+            screen.blit(text_surface, (text_x + 100, text_y + i * line_height + 20))
 
         # 4. Подсказка "Нажмите пробел"
         hint_text = self.small_font.render("[ПРОБЕЛ] Закрыть", True, (200, 200, 200))
@@ -1368,8 +1454,7 @@ class Game:
         self.fishing = Fishing(self.camera, self.player)
         self.item_pickup = ItemPickup(self.camera, self.player)
 
-        self.note = Note(self.camera, self.player,
-                         "Дорогой путник, если ты читаешь это, значит ты уже в опасности...")
+        self.note = Note(self.camera, self.player,text_for_note)
         self.pending_note = None
 
         #создаём врага и один раз задаём ему случайную позицию
@@ -1450,7 +1535,8 @@ class Game:
                 if event.type == pygame.QUIT:
                     self.running = False
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                    self.running = False
+                    if self.battle is None:
+                        self.menu.pause(screen.copy())
 
                     #Открытие замка по E
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_e:
@@ -1477,7 +1563,6 @@ class Game:
                         elif self.tips_for_bed.near_build_flag and self.note_from_bed not in self.player.inventory:
                             self.player.add_to_inventory(self.note_from_bed)
                             self.item_pickup.start_pickup(self.note_from_bed)
-                            # 👇 НЕ запускаем записку сразу, а откладываем
                             self.pending_note = self.note
 
             if self.menu.status:
@@ -1591,6 +1676,8 @@ class Game:
 
 # Запуск игры
 if __name__ == "__main__":
+    menu = Menu()
+    menu.start_screen()
     game = Game()
     game.run()
 
