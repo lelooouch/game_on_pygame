@@ -349,6 +349,8 @@ class Menu:
 
         self.saved_screen = None
 
+        self.font = pygame.font.Font("fonts/menu_font.ttf", 42)
+
     def game_over(self):
         if self.bliding:
             for alpha in range(0, 256, 5):  # шаг 5 — скорость затемнения
@@ -416,17 +418,44 @@ class Menu:
         self.saved_screen = current_screen.copy()
 
         while True:
-            # 1. Рисуем сохранённый игровой экран как основу
+            mouse_pos = pygame.mouse.get_pos()
+            mouse_x, mouse_y = mouse_pos
+
             screen.blit(self.saved_screen, (0, 0))
 
-            # 2. Поверх рисуем затемнение (размытие)
             blur_surface = pygame.Surface((screen_width, screen_height))
             blur_surface.fill((0, 0, 0))
             blur_surface.set_alpha(150)
             screen.blit(blur_surface, (0, 0))
 
-            # 3. Поверх рисуем меню паузы
             screen.blit(self.pause_bg, (self.pause_bg_x, self.pause_bg_y))
+
+            text_1 = self.font.render('continue', True, (155, 45, 48))
+            screen.blit(text_1, (480, 330))
+
+            text_2 = self.font.render('exit', True, (155, 45, 48))
+            screen.blit(text_2, (480, 400))
+
+            continue_hovered = (480 <= mouse_x <= 480 + text_1.get_width() and
+                             330 <= mouse_y <= 330 + text_1.get_height())
+
+            exit_hovered = (480 <= mouse_x <= 480 + text_2.get_width() and
+                            400 <= mouse_y <= 400 + text_2.get_height())
+
+            # Рисуем кнопки (нажатые при наведении)
+            if continue_hovered:
+                text_1 = self.font.render('continue', True, (115, 30, 32))
+                screen.blit(text_1, (480, 330))
+            else:
+                text_1 = self.font.render('continue', True, (155, 45, 48))
+                screen.blit(text_1, (480, 330))
+
+            if exit_hovered:
+                text_2 = self.font.render('exit', True, (115, 30, 32))
+                screen.blit(text_2, (480, 400))
+            else:
+                text_2 = self.font.render('exit', True, (155, 45, 48))
+                screen.blit(text_2, (480, 400))
 
             pygame.display.flip()
 
@@ -436,6 +465,12 @@ class Menu:
                     sys.exit()
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     return  # Выходим из паузы
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if exit_hovered:
+                        pygame.quit()
+                        sys.exit()
+                    elif continue_hovered:
+                        return
 
             clock.tick(60)
 
