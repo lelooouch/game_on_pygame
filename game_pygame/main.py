@@ -93,6 +93,9 @@ class Player:
         self.menu = menu
 
         self.hp = 100
+        self.attack = 60
+        self.crit_attack = 0
+
         self.camera = camera
         self.hp_bar = hp_bar
 
@@ -164,8 +167,9 @@ class Player:
             self.is_invulnerable = False
 
     def health(self):
-        if self.hp >= 0:
-            img = pygame.image.load(hp_bar[self.hp])
+        if self.hp > 0:
+            rounded_hp = max(0, (self.hp // 20) * 20)
+            img = pygame.image.load(hp_bar[rounded_hp])
             img = pygame.transform.scale(img, (int(img.get_width() * 0.75), int(img.get_height() * 0.75)))
             screen.blit(img, (1340, 40))
         else:
@@ -313,13 +317,6 @@ class Player:
 
             current_sprite = self.sprites[self.direction][self.current_frame]
             screen.blit(current_sprite, (screen_x, screen_y))
-        # else:
-        #     # 🔴 Фолбэк: красный квадрат, если спрайт не найден
-        #     # Поможет сразу увидеть проблему при отладке
-        #     pygame.draw.rect(screen, (255, 0, 0), (screen_x, screen_y, 32, 32))
-        #     # Для продакшена можно заменить на заглушку:
-        #     # if self.sprites and 'down' in self.sprites and self.sprites['down']:
-        #     #     screen.blit(self.sprites['down'][0], (screen_x, screen_y))
 
 class Menu:
     def __init__(self):
@@ -364,6 +361,9 @@ class Enemy:
 
         self.x = 0
         self.y = 0
+
+        self.hp = enemy_base['hp']  # здоровье врага
+        self.attack = enemy_base['damage']  # атака врага
 
         # кадры анимации
         self.anim = []
@@ -857,15 +857,12 @@ class ItemPickup:
         self.duration = 2.5  # длительность анимации в секундах
 
         # Спрайт персонажа при получении предмета
-        try:
-            self.pickup_sprite = pygame.image.load("anim/character/player_is_add.png")
-            self.pickup_sprite = pygame.transform.scale(
-                self.pickup_sprite,
-                (int(self.pickup_sprite.get_width() * 0.1),
-                 int(self.pickup_sprite.get_height() * 0.1))
-            )
-        except FileNotFoundError:
-            self.pickup_sprite = None
+        self.pickup_sprite = pygame.image.load("anim/character/player_is_add.png")
+        self.pickup_sprite = pygame.transform.scale(
+            self.pickup_sprite,
+            (int(self.pickup_sprite.get_width() * 0.1),
+                int(self.pickup_sprite.get_height() * 0.1))
+        )
 
         # Картинка предмета (ключ)
         self.item_image = ''
@@ -940,6 +937,333 @@ class ItemPickup:
 
         return True
 
+
+class Note(ItemPickup):
+    def __init__(self, camera, player, text):
+        super().__init__(camera, player)
+
+        self.text = text
+        self.font = pygame.font.Font("fonts/diolog.ttf", 32)
+        self.small_font = pygame.font.Font("fonts/diolog.ttf", 24)
+
+        # Картинка-фон для текста
+        self.image = pygame.image.load('pic/side/note_for_text.png')
+
+        # Позиция картинки
+        self.image_x = (screen_width - self.image.get_width()) // 2
+        self.image_y = (screen_height - self.image.get_height()) // 2
+
+        # Отступы для текста внутри картинки
+        self.text_offset_x = 50
+        self.text_offset_y = 50
+        self.text_max_width = self.image.get_width() - 100
+
+        # Цвет текста
+        self.text_color = (255, 255, 255)
+
+        # Размытие фона
+        self.blur_alpha = 150
+
+    def start_pickup(self, item_data=None):
+        """Запускает показ записки"""
+        if self.is_active:
+            return
+
+        self.is_active = True
+        self.timer = 0
+        self.player.is_picking_up = True  # Блокируем движение
+
+    def update(self, dt, screen, events):
+        """Обновляет показ записки. Возвращает True, если записка активна."""
+        if not self.is_active:
+            return False
+
+        self.timer += dt
+
+        # 1. Рисуем размытый фон (затемнение)
+        blur_surface = pygame.Surface((screen_width, screen_height))
+        blur_surface.fill((0, 0, 0))
+        blur_surface.set_alpha(self.blur_alpha)
+        screen.blit(blur_surface, (0, 0))
+
+        # 2. Рисуем картинку-фон
+        screen.blit(self.image, (self.image_x, self.image_y))
+
+        # 3. Рисуем текст записки с переносом слов
+        text_x = self.image_x + self.text_offset_x
+        text_y = self.image_y + self.text_offset_y
+
+        # Разбиваем текст на строки
+        words = self.text.split()
+        lines = []
+        current_line = ""
+
+        for word in words:
+            test_line = f"{current_line} {word}".strip()
+            if self.font.size(test_line)[0] <= self.text_max_width:
+                current_line = test_line
+            else:
+                if current_line:
+                    lines.append(current_line)
+                current_line = word
+
+        if current_line:
+            lines.append(current_line)
+
+        # Рисуем каждую строку
+        line_height = self.font.get_height() + 10
+        for i, line in enumerate(lines):
+            text_surface = self.font.render(line, True, self.text_color)
+            screen.blit(text_surface, (text_x, text_y + i * line_height))
+
+        # 4. Подсказка "Нажмите пробел"
+        hint_text = self.small_font.render("[ПРОБЕЛ] Закрыть", True, (200, 200, 200))
+        hint_x = (screen_width - hint_text.get_width()) // 2
+        hint_y = screen_height - 80
+        screen.blit(hint_text, (hint_x, hint_y))
+
+        # 5. Обрабатываем нажатие пробела
+        for event in events:
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                self.is_active = False
+                self.player.is_picking_up = False
+                return False
+
+        return True
+
+class Battle:
+    def __init__(self, player, enemy):
+        self.player = player
+        self.enemy = enemy
+
+        self.background = pygame.image.load("pic/battle/location_castle.jpg")
+        self.background = pygame.transform.scale(self.background, (screen_width, screen_height))
+
+        # Состояния: 'player_turn', 'enemy_turn', 'animating', 'victory', 'defeat'
+        self.state = 'player_turn'
+        self.timer = 0
+        self.animation_duration = 1.5
+
+        # Статы игрока (берём из player)
+        self.player_hp = player.hp
+        self.player_max_hp = 100
+        self.player_attack_power = player.attack
+        self.player_crit_damage = player.crit_attack
+
+        # Статы врага (берём из enemy)
+        self.enemy_hp = enemy.hp
+        self.enemy_max_hp = enemy.hp
+        self.enemy_attack_power = enemy.attack
+
+        self.message_attack = 'Сила атаки: ' + str(self.player_attack_power)
+        self.message_crit = 'Крит урон: ' + str(self.player_crit_damage)
+
+        # Визуализация
+        self.dice_value = 0
+        self.message = "Твой ход! Нажми [ПРОБЕЛ] для атаки"
+        self.message_color = (255, 255, 255)
+
+        self.player_battle_sprites = []
+        for i in range(1, 5):
+            frame = pygame.image.load(f"anim/character/attack/{i}.png")
+            new_width = int(frame.get_width() * 0.75)
+            new_height = int(frame.get_height() * 0.75)
+            frame = pygame.transform.scale(frame, (new_width, new_height))
+            self.player_battle_sprites.append(frame)
+
+        self.enemy_scale = 4
+
+        # Анимация игрока
+        self.player_frame = 0
+        self.player_anim_timer = 0
+        self.player_anim_speed = 0.15
+
+        # Анимация врага
+        self.enemy_frame = 0
+        self.enemy_anim_timer = 0
+        self.enemy_anim_speed = 0.15
+
+        self.font = pygame.font.Font("fonts/diolog.ttf", 32)
+        self.small_font = pygame.font.Font("fonts/diolog.ttf", 24)
+
+    def roll_dice(self):
+        """Бросок кубика 1-10"""
+        return random.randint(1, 10)
+
+    def calculate_damage(self, attack, dice_value, crit_damage=0):
+        """Расчёт урона: выпало 1-10, от этого зависит сила (10% - 100%)"""
+        if dice_value == 10:
+            # Критический удар
+            crit_multiplier = 2.0 + (crit_damage / 100)
+            return int(attack * crit_multiplier), True
+        else:
+            # Обычный удар (10% - 90% от атаки)
+            return int(attack * (dice_value / 10)), False
+
+    def player_attack(self):
+        """Игрок атакует врага"""
+        self.dice_value = self.roll_dice()
+        damage, is_crit = self.calculate_damage(
+            self.player_attack_power,
+            self.dice_value,
+            self.player_crit_damage
+        )
+
+        self.enemy_hp -= damage
+
+        if is_crit:
+            self.message = f"КРИТ! Выпало {self.dice_value}. Урон: {damage}"
+            self.message_color = (255, 215, 0)
+        else:
+            self.message = f"Выпало {self.dice_value}. Урон: {damage}"
+            self.message_color = (255, 255, 255)
+
+        if self.enemy_hp <= 0:
+            self.enemy_hp = 0
+            self.state = 'victory'
+            self.message = "Победа! Враг повержен!"
+            self.message_color = (0, 255, 0)
+        else:
+            self.state = 'animating'
+            self.timer = 0
+
+    def enemy_attack(self):
+        """Враг атакует игрока"""
+        self.dice_value = self.roll_dice()
+        damage, is_crit = self.calculate_damage(self.enemy_attack_power, self.dice_value)
+
+        self.player_hp -= damage
+
+        if self.player_hp < 0:
+            self.player_hp = 0
+
+        self.player.hp = self.player_hp  # обновляем реальное HP
+
+        if is_crit:
+            self.message = f"Враг выбросил {self.dice_value}! КРИТ! Урон: {damage}"
+            self.message_color = (255, 100, 100)
+        else:
+            self.message = f"Враг выбросил {self.dice_value}. Урон: {damage}"
+            self.message_color = (255, 255, 255)
+
+        if self.player_hp <= 0:
+            self.state = 'defeat'
+            self.message = "Поражение... Вы погибли"
+            self.message_color = (255, 0, 0)
+            self.timer = 0
+
+        else:
+            self.state = 'animating'
+            self.timer = 0
+
+    def update(self, events, dt):
+        """Обновляет состояние боя"""
+        # Обновляем анимации
+        self.player_anim_timer += dt
+        if self.player_anim_timer >= self.player_anim_speed:
+            self.player_anim_timer = 0
+            if self.player_battle_sprites:
+                self.player_frame = (self.player_frame + 1) % len(self.player_battle_sprites)
+                self.player_frame = min(self.player_frame, len(self.player_battle_sprites) - 1)
+
+        self.enemy_anim_timer += dt
+        if self.enemy_anim_timer >= self.enemy_anim_speed:
+            self.enemy_anim_timer = 0
+            if self.enemy.anim:
+                self.enemy_frame = (self.enemy_frame + 1) % len(self.enemy.anim)
+
+        if self.state in ['victory', 'defeat']:
+            self.timer += dt
+            if self.timer >= 3.0:
+                return True
+            return False
+
+        # Обработка ввода
+        if self.player.hp > 0:
+            if self.state == 'player_turn':
+                for event in events:
+                    if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                        self.player_attack()
+
+            elif self.state == 'animating':
+                self.timer += dt
+                if self.timer >= self.animation_duration:
+                    if self.message.startswith("Враг"):
+                        self.state = 'player_turn'
+                        self.message = "Твой ход! Нажми [ПРОБЕЛ] для атаки"
+                        self.message_color = (255, 255, 255)
+                    else:
+                        self.state = 'enemy_turn'
+                        self.enemy_attack()
+
+            elif self.state == 'enemy_turn':
+                self.enemy_attack()
+
+        return False
+
+    def draw(self, screen):
+        """Отрисовывает арену боя"""
+        # Фон из локации
+        screen.blit(self.background, (0, 0))
+
+        # Позиции персонажей
+        player_x = screen_width // 4 - 50
+        player_y = screen_height // 2 - 100
+        enemy_x = screen_width * 3 // 4 - 50
+        enemy_y = screen_height // 2 - 100
+
+        if self.player_battle_sprites and 0 <= self.player_frame < len(self.player_battle_sprites):
+            sprite = self.player_battle_sprites[self.player_frame]
+            screen.blit(sprite, (player_x, player_y))
+
+        if self.enemy.anim and 0 <= self.enemy_frame < len(self.enemy.anim):
+            enemy_sprite = self.enemy.anim[self.enemy_frame]
+            # Масштабируем врага
+            new_width = int(enemy_sprite.get_width() * self.enemy_scale)
+            new_height = int(enemy_sprite.get_height() * self.enemy_scale)
+            scaled_sprite = pygame.transform.scale(enemy_sprite, (new_width, new_height))
+            # Центрируем увеличенного врага
+            offset_x = (new_width - enemy_sprite.get_width()) // 2
+            offset_y = (new_height - enemy_sprite.get_height()) // 2
+            screen.blit(scaled_sprite, (enemy_x - offset_x, enemy_y - offset_y + 100))
+
+        # Полоски HP
+        self._draw_hp_bar(screen, 100, 100, self.player_hp, self.player_max_hp, "Игрок")
+        self._draw_hp_bar(screen, screen_width - 350, 100, self.enemy_hp, self.enemy_max_hp, "Враг")
+
+        #статы
+        text_1 = self.font.render(self.message_attack, True, self.message_color)
+        screen.blit(text_1, (100, 160))
+
+        text_2 = self.font.render(self.message_crit, True, self.message_color)
+        screen.blit(text_2, (100, 200))
+
+        # Сообщение
+        text = self.font.render(self.message, True, self.message_color)
+        screen.blit(text, (screen_width // 2 - text.get_width() // 2, screen_height - 150))
+
+        # Кубик
+        if self.dice_value > 0:
+            dice_text = self.small_font.render(f"{self.dice_value}", True, (255, 255, 0))
+            screen.blit(dice_text, (screen_width // 2 - dice_text.get_width() // 2, screen_height - 100))
+
+    def _draw_hp_bar(self, screen, x, y, current_hp, max_hp, name):
+        """Отрисовка полоски HP"""
+        bar_width = 250
+        bar_height = 30
+
+        pygame.draw.rect(screen, (50, 50, 50), (x, y, bar_width, bar_height))
+
+        fill_width = int((current_hp / max_hp) * bar_width)
+        color = (0, 255, 0) if current_hp > max_hp * 0.5 else (255, 255, 0) if current_hp > max_hp * 0.25 else (255, 0,
+                                                                                                                0)
+        pygame.draw.rect(screen, color, (x, y, fill_width, bar_height))
+
+        pygame.draw.rect(screen, (255, 255, 255), (x, y, bar_width, bar_height), 2)
+
+        hp_text = self.small_font.render(f"{name}: {current_hp}/{max_hp}", True, (255, 255, 255))
+        screen.blit(hp_text, (x, y - 30))
+
 class Game:
     def __init__(self):
         #Данные первой локации
@@ -991,7 +1315,9 @@ class Game:
             {'rect': pygame.Rect(390, 0, 240, screen_height + 1000), 'image': None},  # левая
             {'rect': pygame.Rect(1250, 0, 240, screen_height + 1000), 'image': None},  # правая
             {'rect': pygame.Rect(1010, 920, 70, 30), 'image': None}, #выход
-            {'rect': pygame.Rect(905, 550, 130, 60), 'image': None}  # камин
+            {'rect': pygame.Rect(905, 550, 130, 60), 'image': None},  # камин
+            {'rect': pygame.Rect(1130, 695, 120, 65), 'image': None}, # перегородка рядом с кроватью
+            {'rect': pygame.Rect(1185, 760, 70, 85), 'image': None} #кровать
         ]
 
         self.location3 = Location(
@@ -1014,6 +1340,8 @@ class Game:
                                'pic': 'pic/objects/key_from_river.png'}
         self.key_from_fireplace = {'name': 'Грязный ключ из камина',
                                'pic': 'pic/objects/key_from_fireplace.png'}
+        self.note_from_bed = {'name': 'Странная записка',
+                              'pic': 'pic/objects/note.png'}
 
         pygame.mixer.music.load('music/INEKT_-_KYRR_first.mp3')
         pygame.mixer.music.set_volume(0.3)  # громкость от 0.0 до 1.0
@@ -1035,15 +1363,22 @@ class Game:
         self.tips_for_house = Tips(self.camera, self.npc, location1_house[1])
         self.tips_for_from_house = Tips(self.camera, self.npc, location3_house[5])
         self.tips_for_fireplace = Tips(self.camera, self.npc, location3_house[6])
+        self.tips_for_bed = Tips(self.camera, self.npc, location3_house[8])
 
         self.fishing = Fishing(self.camera, self.player)
         self.item_pickup = ItemPickup(self.camera, self.player)
+
+        self.note = Note(self.camera, self.player,
+                         "Дорогой путник, если ты читаешь это, значит ты уже в опасности...")
+        self.pending_note = None
 
         #создаём врага и один раз задаём ему случайную позицию
         self.enemy_1 = Enemy(self.camera, enemy_1)
         self.enemy_2 = Enemy(self.camera, enemy_1)
 
         self.enemies = [self.enemy_1, self.enemy_2]
+
+        self.battle = None
 
         # Границы для спавна
         self.enemy_1.random_location(
@@ -1078,6 +1413,37 @@ class Game:
             events = pygame.event.get()
             mouse_pos = pygame.mouse.get_pos()
 
+            # 👇 ПРОВЕРКА СТОЛКНОВЕНИЯ С ВРАГАМИ (только если не в бою)
+            if not self.battle and self.current_location == self.location2:
+                for enemy in self.enemies:
+                    dist = math.hypot(self.player.world_x - enemy.x, self.player.world_y - enemy.y)
+                    if dist < 50:  # расстояние столкновения
+                        self.battle = Battle(self.player, enemy)
+                        break
+
+            # 👇 ЕСЛИ ИДЁТ БОЙ
+            if self.battle:
+                battle_over = self.battle.update(events, dt)
+                self.battle.draw(screen)
+
+                if battle_over:
+                    if self.battle.state == 'victory':
+                        if self.battle.enemy in self.enemies:
+                            self.enemies.remove(self.battle.enemy)
+                            print("Враг побеждён!")
+                    elif self.battle.state == 'defeat':
+                        self.player.hp = 0
+                        self.menu.status = False
+                        self.battle = None
+                        self.menu.game_over()
+                        self.running = False  # 👈 Завершаем игру
+                        return  # 👈 Выходим из run()
+
+                    self.battle = None  # завершаем бой
+                pygame.display.flip()
+                clock.tick(60)
+                continue  # пропускаем остальную логику
+
             for event in events:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     self.player.set_target(mouse_pos[0], mouse_pos[1])
@@ -1104,10 +1470,15 @@ class Game:
                     elif self.current_location == self.location3:
                         if self.tips_for_from_house.near_build_flag:
                             self._switch_location(self.location1)
+                            self.player.world_x, self.player.world_y = (1340, 520)
                         elif self.tips_for_fireplace.near_build_flag and self.key_from_fireplace not in self.player.inventory:
                             self.player.add_to_inventory(self.key_from_fireplace)
                             self.item_pickup.start_pickup(self.key_from_fireplace)
-                            print(self.player.inventory)
+                        elif self.tips_for_bed.near_build_flag and self.note_from_bed not in self.player.inventory:
+                            self.player.add_to_inventory(self.note_from_bed)
+                            self.item_pickup.start_pickup(self.note_from_bed)
+                            # 👇 НЕ запускаем записку сразу, а откладываем
+                            self.pending_note = self.note
 
             if self.menu.status:
                 #Обновляем диалог (только если есть активный NPC)
@@ -1182,12 +1553,28 @@ class Game:
 
                         self.tips_for_from_house.near_build(player_screen_x, player_screen_y, -60, -110)
                         self.tips_for_from_house.draw_E_build(screen)
+
                         if self.key_from_fireplace not in self.player.inventory:
                             self.tips_for_fireplace.near_build(player_screen_x, player_screen_y, -70, 0)
                             self.tips_for_fireplace.draw_E_build(screen)
-
                         is_picking_up = self.item_pickup.update(dt, screen)
                         if is_picking_up:
+                            block_player = True
+
+                        if self.note_from_bed not in self.player.inventory:
+                            self.tips_for_bed.near_build(player_screen_x, player_screen_y, -100, -30)
+                            self.tips_for_bed.draw_E_build(screen)
+                        is_picking_up_note = self.item_pickup.update(dt, screen)
+                        if is_picking_up_note:
+                            block_player = True
+
+                        if not is_picking_up and self.pending_note is not None:
+                            self.pending_note.start_pickup()
+                            self.pending_note = None
+
+                            # 👇 Обновление записки
+                        is_note_active = self.note.update(dt, screen, events)
+                        if is_note_active:
                             block_player = True
 
                     if not block_player:
