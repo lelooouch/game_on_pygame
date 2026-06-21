@@ -431,44 +431,44 @@ class Menu:
             screen.blit(self.pause_bg, (self.pause_bg_x, self.pause_bg_y))
 
             text_1 = self.font.render('continue', True, (155, 45, 48))
-            screen.blit(text_1, (480, 330))
+            screen.blit(text_1, (480, 300))
 
             text_2 = self.font.render('exit', True, (155, 45, 48))
-            screen.blit(text_2, (480, 400))
+            screen.blit(text_2, (480, 370))
 
             text_3 = self.font.render('inventory', True, (155, 45, 48))
-            screen.blit(text_3, (480, 470))
+            screen.blit(text_3, (480, 440))
 
             continue_hovered = (480 <= mouse_x <= 480 + text_1.get_width() and
-                             330 <= mouse_y <= 330 + text_1.get_height())
+                             300 <= mouse_y <= 300 + text_1.get_height())
 
             exit_hovered = (480 <= mouse_x <= 480 + text_2.get_width() and
-                            400 <= mouse_y <= 400 + text_2.get_height())
+                            370 <= mouse_y <= 370 + text_2.get_height())
 
             inventory_hovered = (480 <= mouse_x <= 480 + text_3.get_width() and
-                            470 <= mouse_y <= 470 + text_3.get_height())
+                            440 <= mouse_y <= 440 + text_3.get_height())
 
             # Рисуем кнопки (нажатые при наведении)
             if continue_hovered:
                 text_1 = self.font.render('continue', True, (115, 30, 32))
-                screen.blit(text_1, (480, 330))
+                screen.blit(text_1, (480, 300))
             else:
                 text_1 = self.font.render('continue', True, (155, 45, 48))
-                screen.blit(text_1, (480, 330))
+                screen.blit(text_1, (480, 300))
 
             if exit_hovered:
                 text_2 = self.font.render('exit', True, (115, 30, 32))
-                screen.blit(text_2, (480, 400))
+                screen.blit(text_2, (480, 370))
             else:
                 text_2 = self.font.render('exit', True, (155, 45, 48))
-                screen.blit(text_2, (480, 400))
+                screen.blit(text_2, (480, 370))
 
             if inventory_hovered:
                 text_3 = self.font.render('inventory', True, (115, 30, 32))
-                screen.blit(text_3, (480, 470))
+                screen.blit(text_3, (480, 440))
             else:
                 text_3 = self.font.render('inventory', True, (155, 45, 48))
-                screen.blit(text_3, (480, 470))
+                screen.blit(text_3, (480, 440))
 
             pygame.display.flip()
 
@@ -543,7 +543,6 @@ class Menu:
                     return  # Возвращаемся в меню паузы
 
             clock.tick(60)
-
 
 class Enemy:
     def __init__(self, camera, enemy_base):
@@ -1751,7 +1750,7 @@ class Game:
                             block_player = True
 
                         if self.note_from_bed not in self.player.inventory:
-                            self.tips_for_bed.near_build(player_screen_x, player_screen_y, -100, -30)
+                            self.tips_for_bed.near_build(player_screen_x, player_screen_y, -100, -50)
                             self.tips_for_bed.draw_E_build(screen)
                         is_picking_up_note = self.item_pickup.update(dt, screen)
                         if is_picking_up_note:
@@ -1761,7 +1760,7 @@ class Game:
                             self.pending_note.start_pickup()
                             self.pending_note = None
 
-                            # 👇 Обновление записки
+                            #Обновление записки
                         is_note_active = self.note.update(dt, screen, events)
                         if is_note_active:
                             block_player = True
