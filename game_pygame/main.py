@@ -28,11 +28,10 @@ class Location:
     def __init__(self, name, background_path, house_data, camera_bounds, player_spawn, background_size=None):
         self.name = name
         self.background_path = background_path
-        self.house_data = house_data  # список словарей {'rect': ..., 'image': ...}
+        self.house_data = house_data
         self.camera_bounds = camera_bounds  # (min_x, max_x, min_y, max_y)
         self.player_spawn = player_spawn  # (x, y) мировые координаты
 
-        # Загружаем фон один раз при создании
         self.background = pygame.image.load(background_path)
         if background_size is None:
             background_size = (WORLD_WIDTH, WORLD_HEIGHT)
@@ -519,7 +518,7 @@ class Menu:
                 for item in inventory:
                     # Вычисляем позицию
                     x = start_x + col * (item_size + padding)
-                    y = start_y + row * (item_size + padding + 50)  # +50 для названия
+                    y = start_y + row * (item_size + padding + 50)
 
                     # Загружаем и масштабируем картинку
                     if 'pic' in item and item['pic']:
@@ -910,6 +909,42 @@ class Grid:
         """Передаёт границы камеры из текущей локации"""
         min_x, max_x, min_y, max_y = self.location.camera_bounds
         self.camera.set_bounds(min_x, max_x, min_y, max_y)
+
+class Chest:
+    def __init__(self, camera, location, rect_index, chest_closed_path, chest_open_path):
+        self.camera = camera
+        self.location = location
+        self.rect_index = rect_index  # индекс сундука в house
+
+        # Загружаем картинки
+        self.chest_closed = pygame.image.load(chest_closed_path)
+        self.chest_open = pygame.image.load(chest_open_path)
+
+        # Состояние
+        self.is_open = False
+
+        self.chest_locked_timer = 0  # таймер показа надписи
+        self.chest_locked_duration = 2.0  # 2 секунды
+
+    def draw(self, screen):
+        """Отрисовка сундука (только если мы в правильной локации)"""
+        if self.location.name != "village":
+            return
+
+        camera_coord = self.camera.step()
+        chest_rect = self.location.house[self.rect_index]['rect']
+
+        chest_screen_x = chest_rect.x + camera_coord[0]
+        chest_screen_y = chest_rect.y + camera_coord[1]
+
+        if self.is_open:
+            screen.blit(self.chest_open, (chest_screen_x, chest_screen_y))
+        else:
+            screen.blit(self.chest_closed, (chest_screen_x, chest_screen_y))
+
+    def open_chest(self):
+        """Открывает сундук"""
+        self.is_open = True
 
 class Fishing:
     def __init__(self, camera, player):
@@ -1456,7 +1491,7 @@ class Battle:
 class Game:
     def __init__(self):
         #Данные первой локации
-        location1_house = [
+        self.location1_house = [
             {'rect': pygame.Rect(750, 100, 300, 400), 'image': pygame.image.load("pic/house/castle.png")},
             {'rect': pygame.Rect(1250, 330, 200, 200), 'image': pygame.image.load("pic/house/house_start.png")},
 
@@ -1468,12 +1503,14 @@ class Game:
             {'rect': pygame.Rect(720, 805, 220, 165), 'image': None},
             {'rect': pygame.Rect(2020, 930, 90, 103), 'image': None},
             {'rect': pygame.Rect(1100, 430, 90, 90), 'image': None},  # зона NPC
+
+            {'rect': pygame.Rect(240, 130, 50, 50), 'image': None}
         ]
 
         self.location1 = Location(
             name="village",
             background_path="pic/bg_2.jpg",
-            house_data=location1_house,
+            house_data=self.location1_house,
             camera_bounds=(-710, -5, -420, -5),
             player_spawn=(2050, 600)
         )
@@ -1531,10 +1568,14 @@ class Game:
                                'pic': 'pic/objects/key_from_fireplace.png'}
         self.note_from_bed = {'name': 'Странная записка',
                               'pic': 'pic/objects/note.png'}
+        self.ring_from_chest = {'name': 'Кольцо на крит.урон',
+                              'pic': 'pic/objects/ring.png'}
 
         pygame.mixer.music.load('music/INEKT_-_KYRR_first.mp3')
         pygame.mixer.music.set_volume(0.3)  # громкость от 0.0 до 1.0
         pygame.mixer.music.play(-1)
+
+        self.font = pygame.font.Font("fonts/diolog.ttf", 32)
 
         self.running = True
         self.player = Player(self.current_location.player_spawn[0],
@@ -1546,13 +1587,14 @@ class Game:
         self.npc = NPC("Торговец", npc_frames, first_npc, self.camera)
         self.npc.set_position(1100, 430)
 
-        self.tips = Tips(self.camera, self.npc, location1_house[0])
+        self.tips = Tips(self.camera, self.npc, self.location1_house[0])
         self.tips_for_statue = Tips(self.camera, self.npc, location2_house[0])
         self.tips_for_river = Tips(self.camera, self.npc, location2_house[2])
-        self.tips_for_house = Tips(self.camera, self.npc, location1_house[1])
+        self.tips_for_house = Tips(self.camera, self.npc, self.location1_house[1])
         self.tips_for_from_house = Tips(self.camera, self.npc, location3_house[5])
         self.tips_for_fireplace = Tips(self.camera, self.npc, location3_house[6])
         self.tips_for_bed = Tips(self.camera, self.npc, location3_house[8])
+        self.tips_for_chest = Tips(self.camera, self.npc, self.location1_house[10])
 
         self.fishing = Fishing(self.camera, self.player)
         self.item_pickup = ItemPickup(self.camera, self.player)
@@ -1577,6 +1619,14 @@ class Game:
         self.enemy_2.random_location(
             min_x=300, max_x=screen_width + 430,
             min_y=200, max_y=screen_height + 200
+        )
+
+        self.chest = Chest(
+            camera=self.camera,
+            location=self.location1,
+            rect_index=10,  # индекс сундука в location1_house
+            chest_closed_path="pic/chest/chest_1.png",
+            chest_open_path="pic/chest/chest_2.png"
         )
 
     def _switch_location(self, new_location: Location):
@@ -1624,8 +1674,8 @@ class Game:
                         self.menu.status = False
                         self.battle = None
                         self.menu.game_over()
-                        self.running = False  # 👈 Завершаем игру
-                        return  # 👈 Выходим из run()
+                        self.running = False  # Завершаем игру
+                        return  # Выходим из run()
 
                     self.battle = None  # завершаем бой
                 pygame.display.flip()
@@ -1643,12 +1693,19 @@ class Game:
 
                     #Открытие замка по E
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_e:
-
                     if self.current_location == self.location1:
                         if self.tips.near_build_flag:
                             self._switch_location(self.location2)
                         elif self.tips_for_house.near_build_flag:
                             self._switch_location(self.location3)
+                        elif self.tips_for_chest.near_build_flag and not self.chest.is_open:
+                            if self.key_from_fireplace in self.player.inventory:
+                                self.chest.open_chest()
+                                self.player.inventory.remove(self.key_from_fireplace)
+                                self.item_pickup.start_pickup(self.ring_from_chest)
+                                self.player.inventory.append(self.ring_from_chest)
+                            else:
+                                self.chest.chest_locked_timer = self.chest.chest_locked_duration
 
                     elif self.current_location == self.location2:
                         if self.tips_for_statue.near_build_flag:
@@ -1678,6 +1735,7 @@ class Game:
                     self.npc.draw_dialog(screen)
                 else:
                     self.grid.draw()
+                    self.chest.draw(screen)
 
                     block_player = False
 
@@ -1700,6 +1758,32 @@ class Game:
                         # Проверка близости к дому
                         self.tips_for_house.near_build(player_screen_x, player_screen_y, -80, 50)
                         self.tips_for_house.draw_E_build(screen)
+                        # Проверка близости к сундуку
+                        if not self.chest.is_open:
+                            self.tips_for_chest.near_build(player_screen_x, player_screen_y, -80, 30)
+                            self.tips_for_chest.draw_E_build(screen)
+
+                        is_picking_up_ring = self.item_pickup.update(dt, screen)
+                        if is_picking_up_ring:
+                            block_player = True
+
+                        if self.chest.chest_locked_timer > 0:
+                            self.chest.chest_locked_timer -= dt
+
+                            # Рисуем полупрозрачный фон для надписи
+                            text = self.font.render("Нужен ключ!", True, (255, 100, 100))
+                            text_x = screen_width // 2 - text.get_width() // 2
+                            text_y = screen_height // 2
+
+                            # Фон под текстом
+                            bg_rect = pygame.Rect(text_x - 20, text_y - 10,
+                                                  text.get_width() + 40, text.get_height() + 20)
+                            bg_surface = pygame.Surface((bg_rect.width, bg_rect.height))
+                            bg_surface.fill((0, 0, 0))
+                            bg_surface.set_alpha(180)
+                            screen.blit(bg_surface, (bg_rect.x, bg_rect.y))
+
+                            screen.blit(text, (text_x, text_y))
 
                     elif self.current_location == self.location2:
 
