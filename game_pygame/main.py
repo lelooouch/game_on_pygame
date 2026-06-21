@@ -874,7 +874,7 @@ class Tips:
         self.build_trigger.x = self.build_rect.centerx + ofcet_x + camera_coord[0]
         self.build_trigger.y = self.build_rect.centery + ofcet_y + camera_coord[1]
 
-        pygame.draw.rect(screen, (0, 255, 0), self.build_trigger, 2)
+        #pygame.draw.rect(screen, (0, 255, 0), self.build_trigger, 2) # Зона
 
         if player_point.colliderect(self.build_trigger):
             self.near_build_flag = True
@@ -930,7 +930,7 @@ class Grid:
             )
             if build['image']:
                 screen.blit(build['image'], draw_rect)
-            pygame.draw.rect(screen, (255, 255, 255), draw_rect, 2)  # отладка хитбоксов
+            # pygame.draw.rect(screen, (255, 255, 255), draw_rect, 2)  # отладка хитбоксов
 
     def update_camera_bounds(self):
         """Передаёт границы камеры из текущей локации"""
@@ -1011,7 +1011,7 @@ class Fishing:
             self.fishing_trigger.width,
             self.fishing_trigger.height
         )
-        pygame.draw.rect(screen, (0, 255, 0), draw_rect, 2)  # раскомментируй для отладки
+        # pygame.draw.rect(screen, (0, 255, 0), draw_rect, 2)  # отладка
 
         if player_point.colliderect(draw_rect):
             self.near_fishing_flag = True
@@ -1583,6 +1583,22 @@ class Game:
             background_size=(screen_width + 900, screen_height + 1000)  # размер фона под дом
         )
 
+        location4_house = [
+            {'rect': pygame.Rect(0, 440, screen_width + 2000, 170), 'image': None},  # верхняя граница
+            {'rect': pygame.Rect(0, 848, screen_width + 520, 150), 'image': None},  # нижняя граница
+            {'rect': pygame.Rect(390, 0, 240, screen_height + 1000), 'image': None},  # левая
+            {'rect': pygame.Rect(1250, 0, 240, screen_height + 1000), 'image': None},  # правая
+        ]
+
+        self.location4 = Location(
+            name="castle_2",
+            background_path="pic/bg_4.jpg",
+            house_data=location4_house,
+            camera_bounds=(300, -805, -100, -1005),
+            player_spawn=(1030, 600),
+            background_size=(screen_width + 900, screen_height + 1000)  # размер фона под дом
+        )
+
         self.camera = Camera(-700, -200, screen_width, screen_height)
         self.menu = Menu()
         self.current_location = self.location1
@@ -1632,6 +1648,7 @@ class Game:
         self.tips_for_fireplace = Tips(self.camera, self.npc, location3_house[6])
         self.tips_for_bed = Tips(self.camera, self.npc, location3_house[8])
         self.tips_for_chest = Tips(self.camera, self.npc, self.location1_house[10])
+        self.tips_from_castle = Tips(self.camera, self.npc, location2_house[7])
 
         self.fishing = Fishing(self.camera, self.player)
         self.item_pickup = ItemPickup(self.camera, self.player)
@@ -1688,7 +1705,7 @@ class Game:
             events = pygame.event.get()
             mouse_pos = pygame.mouse.get_pos()
 
-            # 👇 ПРОВЕРКА СТОЛКНОВЕНИЯ С ВРАГАМИ (только если не в бою)
+            # ПРОВЕРКА СТОЛКНОВЕНИЯ С ВРАГАМИ (только если не в бою)
             if not self.battle and self.current_location == self.location2:
                 for enemy in self.enemies:
                     dist = math.hypot(self.player.world_x - enemy.x, self.player.world_y - enemy.y)
@@ -1696,7 +1713,7 @@ class Game:
                         self.battle = Battle(self.player, enemy)
                         break
 
-            # 👇 ЕСЛИ ИДЁТ БОЙ
+            # ЕСЛИ ИДЁТ БОЙ
             if self.battle:
                 battle_over = self.battle.update(events, dt)
                 self.battle.draw(screen)
@@ -1758,6 +1775,10 @@ class Game:
                             self.player.hp = 100
                         elif self.fishing.near_fishing_flag and self.fishing.state == 'idle' and self.key_from_river not in self.player.inventory:
                             self.fishing.start_fishing()
+                        elif self.tips_from_castle.near_build_flag and self.key_from_river in self.player.inventory:
+                            self.sound_door.play()
+                            pygame.time.delay(100)
+                            self._switch_location(self.location4)
 
                     elif self.current_location == self.location3:
                         if self.tips_for_from_house.near_build_flag:
@@ -1787,7 +1808,8 @@ class Game:
                     self.npc.draw_dialog(screen)
                 else:
                     self.grid.draw()
-                    self.chest.draw(screen)
+                    if self.current_location == self.location1:
+                        self.chest.draw(screen)
 
                     block_player = False
 
@@ -1860,6 +1882,8 @@ class Game:
                         self.fishing.player_is_near(player_screen_x, player_screen_y)
                         self.tips_for_statue.draw_E_build(screen)
 
+                        self.tips_from_castle.near_build(player_screen_x, player_screen_y, -155, 40)
+                        self.tips_from_castle.draw_E_build(screen)
 
                         is_fishing_active = self.fishing.update(dt, events, self.key_from_river, self.item_pickup)
                         if is_fishing_active:
