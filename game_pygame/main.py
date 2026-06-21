@@ -414,7 +414,7 @@ class Menu:
 
             clock.tick(60)
 
-    def pause(self, current_screen):
+    def pause(self, current_screen, inventory):
         self.saved_screen = current_screen.copy()
 
         while True:
@@ -436,11 +436,17 @@ class Menu:
             text_2 = self.font.render('exit', True, (155, 45, 48))
             screen.blit(text_2, (480, 400))
 
+            text_3 = self.font.render('inventory', True, (155, 45, 48))
+            screen.blit(text_3, (480, 470))
+
             continue_hovered = (480 <= mouse_x <= 480 + text_1.get_width() and
                              330 <= mouse_y <= 330 + text_1.get_height())
 
             exit_hovered = (480 <= mouse_x <= 480 + text_2.get_width() and
                             400 <= mouse_y <= 400 + text_2.get_height())
+
+            inventory_hovered = (480 <= mouse_x <= 480 + text_3.get_width() and
+                            470 <= mouse_y <= 470 + text_3.get_height())
 
             # Рисуем кнопки (нажатые при наведении)
             if continue_hovered:
@@ -457,6 +463,13 @@ class Menu:
                 text_2 = self.font.render('exit', True, (155, 45, 48))
                 screen.blit(text_2, (480, 400))
 
+            if inventory_hovered:
+                text_3 = self.font.render('inventory', True, (115, 30, 32))
+                screen.blit(text_3, (480, 470))
+            else:
+                text_3 = self.font.render('inventory', True, (155, 45, 48))
+                screen.blit(text_3, (480, 470))
+
             pygame.display.flip()
 
             for event in pygame.event.get():
@@ -464,16 +477,72 @@ class Menu:
                     pygame.quit()
                     sys.exit()
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                    return  # Выходим из паузы
+                    return
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if exit_hovered:
                         pygame.quit()
                         sys.exit()
                     elif continue_hovered:
                         return
-
+                    elif inventory_hovered:
+                        self.show_inventory(inventory)
             clock.tick(60)
 
+    def show_inventory(self, inventory):
+        while True:
+            # Рисуем фон
+            screen.blit(self.saved_screen, (0, 0))
+
+            blur_surface = pygame.Surface((screen_width, screen_height))
+            blur_surface.fill((0, 0, 0))
+            blur_surface.set_alpha(150)
+            screen.blit(blur_surface, (0, 0))
+
+            # Заголовок
+            title = self.font.render('Inventory', True, (255, 255, 255))
+            screen.blit(title, (screen_width // 2 - title.get_width() // 2, 100))
+
+            # Список предметов
+            if not inventory:
+                text = self.font.render('No items', True, (200, 200, 200))
+                screen.blit(text, (screen_width // 2 - text.get_width() // 2, 200))
+            else:
+                item_size = 100  # размер ячейки
+                padding = 20  # отступ между предметами
+                start_x = screen_width // 2 - 200  # начальная позиция
+                start_y = 200  # начальная Y
+
+                col = 0
+                row = 0
+                max_cols = 4  # максимум 4 предмета в ряд
+
+                for item in inventory:
+                    # Вычисляем позицию
+                    x = start_x + col * (item_size + padding)
+                    y = start_y + row * (item_size + padding + 50)  # +50 для названия
+
+                    # Загружаем и масштабируем картинку
+                    if 'pic' in item and item['pic']:
+                        item_img = pygame.image.load(item['pic'])
+                        item_img = pygame.transform.scale(item_img, (item_size, item_size))
+                        screen.blit(item_img, (x, y))
+
+                    # Следующая колонка/строка
+                    col += 1
+                    if col >= max_cols:
+                        col = 0
+                        row += 1
+
+            pygame.display.flip()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    return  # Возвращаемся в меню паузы
+
+            clock.tick(60)
 
 
 class Enemy:
@@ -1571,7 +1640,7 @@ class Game:
                     self.running = False
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     if self.battle is None:
-                        self.menu.pause(screen.copy())
+                        self.menu.pause(screen.copy(), self.player.inventory)
 
                     #Открытие замка по E
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_e:
