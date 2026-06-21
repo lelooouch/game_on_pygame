@@ -350,6 +350,18 @@ class Menu:
 
         self.font = pygame.font.Font("fonts/menu_font.ttf", 42)
 
+        self.button_sound = pygame.mixer.Sound('music/btn_press.mp3')
+        self.button_sound.set_volume(0.3)
+
+        self.menu_sound = pygame.mixer.Sound('music/sound_for_menu.mp3')
+        self.menu_sound.set_volume(0.5)
+
+        self.close_menu_sound = pygame.mixer.Sound('music/sound_for_close_menu.mp3')
+        self.menu_sound.set_volume(0.5)
+
+        self.sound_for_start = pygame.mixer.Sound('music/sound_for_start.mp3')
+        self.sound_for_start.set_volume(0.5)
+
     def game_over(self):
         if self.bliding:
             for alpha in range(0, 256, 5):  # шаг 5 — скорость затемнения
@@ -370,6 +382,8 @@ class Menu:
 
     def start_screen(self):
         """Начальный экран с кнопками Start и Exit"""
+        self.sound_for_start.play()
+
         while True:
             # Рисуем фон
             screen.blit(self.start_bg, (0, 0))
@@ -406,8 +420,12 @@ class Menu:
 
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if start_hovered:
+                        self.button_sound.play()
+                        pygame.time.delay(100)
+                        self.sound_for_start.stop()
                         return  # Выходим из start_screen, игра начинается
                     elif exit_hovered:
+                        self.button_sound.play()
                         pygame.quit()
                         sys.exit()
 
@@ -416,6 +434,8 @@ class Menu:
     def pause(self, current_screen, inventory):
         self.saved_screen = current_screen.copy()
 
+        self.menu_sound.play()
+        pygame.time.delay(100)
         while True:
             mouse_pos = pygame.mouse.get_pos()
             mouse_x, mouse_y = mouse_pos
@@ -476,14 +496,21 @@ class Menu:
                     pygame.quit()
                     sys.exit()
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    self.close_menu_sound.play()
+                    pygame.time.delay(100)
                     return
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if exit_hovered:
+                        self.button_sound.play()
                         pygame.quit()
                         sys.exit()
                     elif continue_hovered:
+                        self.button_sound.play()
+                        pygame.time.delay(100)
                         return
                     elif inventory_hovered:
+                        self.button_sound.play()
+                        pygame.time.delay(100)
                         self.show_inventory(inventory)
             clock.tick(60)
 
@@ -1524,6 +1551,7 @@ class Game:
             {'rect': pygame.Rect(740, screen_height + 350, 100, 150), 'image': None},  # нижняя граница
             {'rect': pygame.Rect(0, 0, 240, screen_height + 1000), 'image': None}, # левая
             {'rect': pygame.Rect(screen_width + 530, 0, 240, screen_height + 1000), 'image': None}, # правая
+            {'rect': pygame.Rect(1600, 700, 300, 200), 'image': pygame.image.load("pic/house/exit.png")}
         ]
 
         self.location2 = Location(
@@ -1574,6 +1602,15 @@ class Game:
         pygame.mixer.music.load('music/INEKT_-_KYRR_first.mp3')
         pygame.mixer.music.set_volume(0.3)  # громкость от 0.0 до 1.0
         pygame.mixer.music.play(-1)
+
+        self.sound_chest = pygame.mixer.Sound('music/open_chest.mp3')
+        self.sound_chest.set_volume(0.3)
+
+        self.sound_door = pygame.mixer.Sound('music/open_door.mp3')
+        self.sound_door.set_volume(0.3)
+
+        self.sound_for_add = pygame.mixer.Sound('music/sound_for_add.mp3')
+        self.sound_for_add.set_volume(0.3)
 
         self.font = pygame.font.Font("fonts/diolog.ttf", 32)
 
@@ -1695,11 +1732,20 @@ class Game:
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_e:
                     if self.current_location == self.location1:
                         if self.tips.near_build_flag:
+                            self.sound_door.play()
+                            pygame.time.delay(100)
                             self._switch_location(self.location2)
                         elif self.tips_for_house.near_build_flag:
+                            self.sound_door.play()
+                            pygame.time.delay(100)
                             self._switch_location(self.location3)
                         elif self.tips_for_chest.near_build_flag and not self.chest.is_open:
                             if self.key_from_fireplace in self.player.inventory:
+                                self.sound_chest.play()
+                                pygame.time.delay(100)
+                                self.sound_for_add.play()
+                                pygame.time.delay(100)
+                                self.player.crit_attack += 20
                                 self.chest.open_chest()
                                 self.player.inventory.remove(self.key_from_fireplace)
                                 self.item_pickup.start_pickup(self.ring_from_chest)
@@ -1715,12 +1761,18 @@ class Game:
 
                     elif self.current_location == self.location3:
                         if self.tips_for_from_house.near_build_flag:
+                            self.sound_door.play()
+                            pygame.time.delay(100)
                             self._switch_location(self.location1)
                             self.player.world_x, self.player.world_y = (1340, 520)
                         elif self.tips_for_fireplace.near_build_flag and self.key_from_fireplace not in self.player.inventory:
+                            self.sound_for_add.play()
+                            pygame.time.delay(100)
                             self.player.add_to_inventory(self.key_from_fireplace)
                             self.item_pickup.start_pickup(self.key_from_fireplace)
                         elif self.tips_for_bed.near_build_flag and self.note_from_bed not in self.player.inventory:
+                            self.sound_for_add.play()
+                            pygame.time.delay(100)
                             self.player.add_to_inventory(self.note_from_bed)
                             self.item_pickup.start_pickup(self.note_from_bed)
                             self.pending_note = self.note
@@ -1760,7 +1812,7 @@ class Game:
                         self.tips_for_house.draw_E_build(screen)
                         # Проверка близости к сундуку
                         if not self.chest.is_open:
-                            self.tips_for_chest.near_build(player_screen_x, player_screen_y, -80, 30)
+                            self.tips_for_chest.near_build(player_screen_x, player_screen_y, -80, -10)
                             self.tips_for_chest.draw_E_build(screen)
 
                         is_picking_up_ring = self.item_pickup.update(dt, screen)
